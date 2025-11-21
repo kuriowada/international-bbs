@@ -25,6 +25,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [userRole, setUserRole] = useState<'student' | 'admin'>('student'); // ★管理者権限のState
   const [inputText, setInputText] = useState("");
   const [selectedType, setSelectedType] = useState("question");
   const [activeTab, setActiveTab] = useState("all"); // Tab switching
@@ -33,25 +34,38 @@ export default function Home() {
   const [materialTitle, setMaterialTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
-  // --- Initialization ---
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchPosts();
-        fetchMaterials();
-      }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchPosts();
-        fetchMaterials();
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // --- Data Fetching Functions ---
 
+  // ★管理者権限取得関数
+  const fetchUserRole = async () => {
+    const user = (await supabase.auth.getSession()).data.session?.user;
+    if (!user) {
+      setUserRole('student');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching user role:", error);
+    }
+
+    if (data?.role) {
+      setUserRole(data.role as 'student' | 'admin');
+    } else {
+      const { error: insertError } = await supabase
+        .from("users")
+        .insert({ id: user.id, role: 'student' });
+      if (!insertError) {
+        setUserRole('student');
+      }
+    }
+  };
+  
   const fetchPosts = async () => {
     const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false });
     if (data) setPosts(data);
@@ -61,20 +75,41 @@ export default function Home() {
     const { data } = await supabase.from("materials").select("*").order("created_at", { ascending: false });
     if (data) setMaterials(data);
   };
+  
+  // --- Initialization ---
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        fetchPosts();
+        fetchMaterials();
+        fetchUserRole(); // ★Role取得を呼び出し
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchPosts();
+        fetchMaterials();
+        fetchUserRole(); // ★Role取得を呼び出し
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // --- Actions ---
 
-  // ▼▼▼ Google Login Added Here ▼▼▼
+  // ★Googleログイン関数（修正済み）
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        // ★修正ポイント: 本番URLに固定
+        redirectTo: 'https://globalcampsstpaul.com',
       },
     });
     if (error) alert(error.message);
   };
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const handleUpload = async () => {
     if (!uploadFile || !materialTitle) return alert("Please select a title and a file.");
@@ -97,21 +132,55 @@ export default function Home() {
     }
   };
 
+  // ★投稿処理 (News投稿の権限チェック含む)
   const handlePost = async () => {
     if (!inputText) return;
+    
+    // News投稿の管理者権限チェック
+    if (selectedType === 'news' && userRole !== 'admin') {
+        alert("You do not have permission to post News.");
+        return;
+    }
+
     await supabase.from("posts").insert([{ content: inputText, type: selectedType }]);
     setInputText("");
     fetchPosts();
   };
 
+  // ★投稿削除処理 (RLSによりadminのみ実行可能)
+  const handleDeletePost = async (postId: number) => {
+      if (!window.confirm("Are you sure you want to delete this post?")) {
+          return;
+      }
+      
+      setLoading(true);
+      const { error } = await supabase
+          .from("posts")
+          .delete()
+          .eq("id", postId); 
+
+      if (error) {
+          alert("Deletion failed: " + error.message);
+          console.error("Delete Error:", error);
+      } else {
+          fetchPosts(); 
+      }
+      setLoading(false);
+  };
+
+
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) alert(error.message);
+    if (!error) fetchUserRole(); 
   };
   const handleSignUp = async () => {
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) alert(error.message);
-    else alert("Check your email!");
+    else {
+        alert("Check your email!");
+        fetchUserRole(); 
+    }
   };
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -132,7 +201,7 @@ export default function Home() {
   // ▼▼▼ VIEW (JSX) ▼▼▼
   // ==========================================
 
-  // 1. Login Screen (Centered, Desktop optimized)
+  // 1. Login Screen (Google Login含む)
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
@@ -149,7 +218,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-gray-800 mb-8">Log In</h2>
             <div className="space-y-5">
               
-              {/* ▼▼▼ Google Button Added Here ▼▼▼ */}
+              {/* Google Button */}
               <button 
                 onClick={handleGoogleLogin}
                 className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-4 rounded-xl font-bold hover:bg-gray-50 transition shadow-sm"
@@ -168,7 +237,6 @@ export default function Home() {
                 <span className="text-gray-400 text-sm font-medium">or</span>
                 <div className="h-px bg-gray-200 flex-1"></div>
               </div>
-              {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
 
               <input className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
               <input className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -224,7 +292,7 @@ export default function Home() {
         {/* === [CENTER COLUMN] Main Feed === */}
         <main className="flex-1 min-w-0">
           
-          {/* Mode: Material Sharing */}
+          {/* Mode: Material Sharing (そのまま) */}
           {activeTab === "materials" ? (
             <div className="space-y-6">
               {/* Upload Card */}
@@ -278,7 +346,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            /* Mode: Feed Timeline */
+            /* Mode: Feed Timeline (権限チェックあり) */
             <div className="space-y-6">
               {/* Post Input */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
@@ -299,7 +367,12 @@ export default function Home() {
                             onChange={(e) => setSelectedType(e.target.value)}
                           >
                             <option value="question">❓ Q&A</option>
-                            <option value="news">📢 News</option>
+                            {/* Newsオプションの表示・無効化制御 */}
+                            {userRole === 'admin' ? (
+                                <option value="news">📢 News</option>
+                            ) : (
+                                <option value="news" disabled={selectedType !== 'news'}>📢 News (Admin Only)</option>
+                            )}
                             <option value="tip">💡 Tips</option>
                           </select>
                       </div>
@@ -311,7 +384,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Feed List */}
+              {/* Feed List (削除ボタン表示の権限チェックあり) */}
               {posts.filter(p => activeTab === "all" || p.type === activeTab).map((post) => (
                 <div key={post.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition">
                     <div className="flex justify-between items-start mb-4">
@@ -332,6 +405,17 @@ export default function Home() {
                       <button className="text-gray-400 hover:text-blue-500 font-bold text-sm flex items-center gap-2 transition">
                         <span>💬</span> Comment
                       </button>
+                      
+                      {/* ★管理者のみに削除ボタンを表示 */}
+                      {userRole === 'admin' && (
+                          <button 
+                              onClick={() => handleDeletePost(post.id)}
+                              className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition ml-auto"
+                              disabled={loading}
+                          >
+                              <span>🗑️</span> Delete
+                          </button>
+                      )}
                     </div>
                 </div>
               ))}
@@ -347,8 +431,8 @@ export default function Home() {
             <div className="flex items-center gap-4 mb-4">
                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-green-400 to-blue-500"></div>
                <div>
-                  <p className="font-bold text-lg">You</p>
-                  <p className="text-xs text-gray-500">{email}</p>
+                  <p className="font-bold text-lg">You ({userRole})</p> {/* ★役割の表示 */}
+                  <p className="text-xs text-gray-500">{session?.user.email || email}</p>
                </div>
             </div>
             <div className="flex justify-between text-center bg-gray-50 p-3 rounded-xl">
