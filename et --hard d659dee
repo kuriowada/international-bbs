@@ -1,0 +1,20 @@
+[33m466df9f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Reset: Reverting to initial stable version without complex features
+[33macbc46f[m Reset: Reverting to initial stable version without complex features
+[33mc259dbb[m Design: Implement cutting-edge dark theme with glassmorphism and neon accents
+[33m272b7e5[m Final Polish: Fix variable names and types for complete functionality
+[33md659dee[m Complete: Enable comment feature with display and database saving
+[33mabff62b[m Final Fix: Add user_email to post insert and handle null user ID in fetch
+[33m5f6f2bf[m Fix: Resolve critical TypeScript parser errors in fetchPosts (likes query)
+[33mf541295[m Feature: Restrict likes to one per user using likes table
+[33ma8c3c6a[m Feature: Implement Likes and Comment UI structure
+[33m07e138d[m Fix: Remove arrow from Tutorial Next button and apply final UI changes
+[33m4aa0fd6[m Final: Integrate interactive tutorial, fix all TypeScript warnings, and complete Materials UI
+[33me1c84b0[m Final: Integrate tutorial, resolve TypeScript errors, and complete materials filtering UI
+[33m1c3c02d[m Feature: Complete Materials tab UI, filtering, and admin file deletion
+[33m8e91645[m Feature: Implement material filtering UI and rich metadata display
+[33m0114fb3[m Feature: Add Tips tab to navigation
+[33mbfcbd77[m Feature: Add metadata fields (Grade, Subject, Unit) to Material Upload form
+[33m7f489d9[m Fix: Redirect to custom domain after login
+[33ma4f854a[m Add Google Login
+[33m48d1817[m English design update
+[33m496155e[m first deploy
