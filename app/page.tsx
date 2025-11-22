@@ -24,8 +24,11 @@ type Post = {
   type: string;
   user_email?: string;
   created_at: string;
-  // likes_countとcomments_countは一旦削除（DB変更に対応）
   comments_count?: number; 
+  
+  // UPDATED: 複合クエリの結果を格納するフィールド
+  likes_count: number;
+  has_liked: boolean; // ユーザーがいいね済みか
 };
 
 type Material = {
@@ -47,7 +50,7 @@ interface SelectInputProps {
     placeholder: string;
 }
 
-// ★ NEW COMPONENT: GUIDED TOUR MODAL
+// GuidedTourModal コンポーネント (省略)
 const GuidedTourModal: React.FC<{ 
     currentStep: number; 
     onNext: () => void; 
@@ -62,7 +65,6 @@ const GuidedTourModal: React.FC<{
     const isLastStep = currentStep === totalSteps - 1;
     const isFirstStep = currentStep === 0;
 
-    // Simulate navigation by setting the active tab to the current step's tab
     useEffect(() => {
         if (currentStep >= 0) {
             onSetTab(stepData.id);
@@ -141,7 +143,7 @@ export default function Home() {
   const [currentTourStep, setCurrentTourStep] = useState(-1);
   const totalTourSteps = tutorialContent.length;
   
-  // ★NEW STATES for Comment Feature
+  // NEW STATES for Comment Feature
   const [showCommentInput, setShowCommentInput] = useState<{[key: number]: boolean}>({}); 
   const [commentInputs, setCommentInputs] = useState<{[key: number]: string}>({}); 
 
@@ -158,11 +160,38 @@ export default function Home() {
     }
   };
   
-  // ★UPDATED: likes_countの取得を削除
+  // ★FIXED: 複合クエリを修正し、Likesとユーザーのステータスを取得
   const fetchPosts = async () => {
-    // likes_countカラムを削除したため、単に全て(*)を取得するように変更
-    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false }); 
-    if (data) setPosts(data);
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId = user ? user.id : null;
+
+    const { data: posts, error } = await supabase
+        .from('posts')
+        .select(`
+            id, content, type, user_email, created_at, comments_count,
+            likes_count:likes(count),
+            user_has_liked:likes(count)
+                .eq('user_id', '${currentUserId}') 
+        `)
+        .order('created_at', { ascending: false });
+        
+    // ★CRITICAL FIX: データを整形し、型チェックを通過させる
+    if (error) {
+        // SQLクエリ自体が失敗した場合、空の配列を返す
+        console.error("Error fetching posts:", error);
+        setPosts([]);
+        return;
+    }
+    
+    const flattenedPosts = posts?.map((post: any) => ({
+        ...post,
+        // likes_count は配列で返ってくるので、最初の要素のcountを取得 (または 0)
+        likes_count: post.likes_count?.[0]?.count || 0,
+        // user_has_liked が 1 以上なら true (いいね済み)
+        has_liked: post.user_has_liked?.[0]?.count > 0,
+    } as Post)); 
+
+    if (flattenedPosts) setPosts(flattenedPosts);
   };
   
   const fetchMaterials = async () => {
@@ -220,46 +249,41 @@ export default function Home() {
     if (error) alert(error.message);
   };
 
-  // ★UPDATED: いいね機能の実装 (likesテーブルに挿入)
-  const handleLike = async (postId: number) => { // currentLikes引数は削除
-      if (loading || !session?.user.id) return;
+  // ★UPDATED: いいね機能のトグル処理
+  const handleLikeToggle = async (postId: number) => { 
+      if (loading || !session?.user.id) {
+          alert("ログインが必要です。");
+          return;
+      }
       setLoading(true);
       
       try {
-          const { error } = await supabase
-              .from("likes") // ★ likes テーブルに挿入
-              .insert({ 
-                  post_id: postId,
-                  user_id: session.user.id // ★ ログインユーザーのIDを使用
-              });
+          // RPC (Remote Procedure Call) でデータベース関数を実行
+          const { error } = await supabase.rpc('toggle_like', {
+              post_id_input: postId,
+              user_id_input: session.user.id
+          });
 
           if (error) {
-              // 複合主キー違反 (23505)は、既にいいね済みという意味なので、エラーではない
-              if (error.code === '23505') {
-                  alert("既にこの投稿に「いいね」しています。");
-              } else {
-                  throw error; // その他のエラーは投げる
-              }
+              throw error;
           } else {
-              // 成功したら投稿一覧を再取得
-              fetchPosts(); 
+              fetchPosts(); // 更新されたカウントとステータスを再取得
           }
       } catch (error: any) {
-          alert("いいねに失敗しました。RLSポリシーを確認してください: " + error.message);
-          console.error("Like Error:", error);
+          alert("いいね処理に失敗しました。RLSポリシーを確認してください: " + error.message);
+          console.error("Like Toggle Error:", error);
       } finally {
           setLoading(false);
       }
   };
   
-  // ★NEW: コメント送信機能の準備 (仮実装)
+  // NEW: コメント送信機能の準備 (仮実装)
   const handleCommentSubmit = async (postId: number) => {
       const commentContent = commentInputs[postId];
       if (!commentContent || loading) return;
 
       setLoading(true);
 
-      // DBへの保存処理は、Supabaseでコメントテーブルを作成後に実装してください。
       alert(`【コメントを送信】投稿ID: ${postId} / 内容: "${commentContent}" を送信しました。`);
       
       setCommentInputs(prev => ({ ...prev, [postId]: '' }));
@@ -696,13 +720,14 @@ export default function Home() {
                     
                     {/* ★UPDATED: いいねとコメントのボタン */}
                     <div className="flex gap-6 mt-6 pl-13 border-t border-gray-50 pt-4">
-                      {/* いいねボタン (いいね数表示とカウントアップ機能) - likes_countは一時的に削除 */}
+                      {/* いいねボタン (トグル機能とカウント表示) */}
                       <button 
-                          onClick={() => handleLike(post.id)}
-                          className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition"
+                          onClick={() => handleLikeToggle(post.id)}
+                          className={`font-bold text-sm flex items-center gap-2 transition ${post.has_liked ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-red-500'}`}
                           disabled={loading}
                       >
-                          <span>❤️</span> Like (N/A)
+                          {/* いいね済みなら塗りつぶし、そうでなければ白抜き */}
+                          <span>{post.has_liked ? '❤️' : '🤍'}</span> Like ({post.likes_count || 0})
                       </button>
                       
                       {/* コメントボタン (入力欄の表示/非表示をトグル) */}
