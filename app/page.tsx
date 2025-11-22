@@ -8,7 +8,7 @@ const GRADE_OPTIONS = ['Year 12', 'Year 11', 'Year 10'];
 const SUBJECT_OPTIONS = ['Math', 'English']; 
 const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
-// ★ TUTORIAL DATA STRUCTURE (USED for STEPPER)
+// チュートリアルコンテンツ (アイコンを分離し、データ構造を修正)
 const tutorialContent = [
     { id: "all", label: "Home", icon: "🏠", description: "This is where you see all activity (Q&A, Tips, News) in chronological order. It provides a full overview of the campus feed." },
     { id: "question", label: "Q&A", icon: "❓", description: "Use this tab to ask questions when you encounter academic or lifestyle issues, and get advice from other students." },
@@ -37,7 +37,7 @@ type Material = {
   language?: string; 
 };
 
-// SelectInput Component Props
+// SelectInput コンポーネントのプロパティ型定義 (TypeScript修正)
 interface SelectInputProps {
     value: string;
     onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
@@ -98,7 +98,7 @@ const GuidedTourModal: React.FC<{
                         onClick={isLastStep ? onClose : onNext}
                         className="bg-green-600 text-white py-2 px-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200"
                     >
-                        {isLastStep ? 'End Tour' : 'Next Step &rarr;'}
+                        {isLastStep ? 'End Tour' : 'Next Step'} {/* ★修正点: テキストを'Next Step'に修正 */}
                     </button>
                 </div>
             </div>
@@ -135,7 +135,7 @@ export default function Home() {
   const [filterGrade, setFilterGrade] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   
-  // ★NEW GUIDED TOUR STATES
+  // NEW GUIDED TOUR STATES
   const [currentTourStep, setCurrentTourStep] = useState(-1);
   const totalTourSteps = tutorialContent.length;
 
@@ -159,7 +159,6 @@ export default function Home() {
   const fetchMaterials = async () => {
     let query = supabase.from("materials").select("*").order("created_at", { ascending: false });
     
-    // フィルタリングロジックの適用
     if (filterLanguage && filterLanguage !== 'All Languages') {
         query = query.eq('language', filterLanguage);
     }
@@ -425,7 +424,7 @@ export default function Home() {
                         ? "bg-blue-50 text-blue-600"
                         : "text-gray-500 hover:bg-gray-50"
                     }
-                    ${currentTourStep === index ? 'border-2 border-red-500 ring-2 ring-red-300 shadow-lg' : ''} // ★ツアー中のハイライト
+                    ${currentTourStep === index ? 'border-2 border-red-500 ring-2 ring-red-300 shadow-lg' : ''} 
                     `}
                   >
                     <span className="text-xl">{item.icon}</span> {item.label}
