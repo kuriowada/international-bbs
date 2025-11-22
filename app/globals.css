@@ -13,6 +13,7 @@ body {
   font-family: sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
+  line-height: 1.5;
 }
 
 /* --- コンポーネントの基本スタイル --- */
@@ -55,7 +56,15 @@ body {
 
 /* メインと入力欄 */
 .main-content { flex: 1; }
-.text-input { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; }
+.text-input, .textarea-input, .select-input {
+  width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; background-color: white;
+}
+
+/* ボタン */
+.btn-primary {
+  background-color: var(--primary-color); color: white; padding: 8px 20px;
+  border: none; border-radius: 9999px; font-weight: bold; cursor: pointer;
+}
 
 /* 投稿・アクションボタン */
 .post-actions {
@@ -68,16 +77,19 @@ body {
 }
 .post-actions button.liked { color: #ef4444; }
 .badge { padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; }
-.badge-q { background: #10b981; }
-.badge-n { background: #ef4444; }
-.badge-t { background: #f59e0b; }
+.badge-q { background: #10b981; } .badge-n { background: #ef4444; } .badge-t { background: #f59e0b; }
 
-/* モバイル対応 */
-@media (max-width: 768px) {
-  .sidebar { display: none; }
-  .container { padding: 10px; padding-bottom: 80px; }
-  .mobile-nav {
-    position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid #e5e7eb;
-    display: flex; justify-content: space-around; padding: 8px 0; z-index: 50;
-  }
+/* モバイルヘッダーとフッター */
+.mobile-header {
+  position: fixed; top: 0; left: 0; right: 0; height: 60px; background: white; border-bottom: 1px solid #e5e7eb; z-index: 50; display: flex; justify-content: space-between; align-items: center; padding: 0 16px;
 }
+.mobile-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: white; border-top: 1px solid #e5e7eb; z-index: 50; display: flex; justify-content: space-around; padding: 8px 0;
+}
+/* Tailwindユーティリティの代替 */
+.flex { display: flex; } .gap-4 { gap: 1rem; } .w-full { width: 100%; } .float-right { float: right; }
+.p-6 { padding: 1.5rem; } .p-3 { padding: 0.75rem; }
+.rounded-xl { border-radius: 0.75rem; } .rounded-3xl { border-radius: 1.5rem; }
+.shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.border { border: 1px solid #e5e7eb; }
+@media (min-width: 768px) { .md\:hidden { display: none; } }

@@ -1,5 +1,5 @@
 // @ts-nocheck
-// このコードは、Tailwindの競合を避けるため、標準CSSクラスを使用します。
+// このファイルは、Tailwindの設定エラーを避けるため、標準CSSクラスを使用しています。
 
 "use client";
 
@@ -13,11 +13,11 @@ const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
 // チュートリアルコンテンツ
 const tutorialContent = [
-    { id: "all", label: "Home", icon: "🏠" },
-    { id: "question", label: "Q&A", icon: "❓" },
-    { id: "tip", label: "Tips", icon: "💡" }, 
-    { id: "news", label: "News", icon: "📢" },
-    { id: "materials", label: "Materials", icon: "📚" },
+    { id: "all", label: "Home", icon: "🏠", description: "View all activities." },
+    { id: "question", label: "Q&A", icon: "❓", description: "Ask questions." },
+    { id: "tip", label: "Tips", icon: "💡", description: "Share helpful tips." }, 
+    { id: "news", label: "News", icon: "📢", description: "Admin announcements." },
+    { id: "materials", label: "Materials", icon: "📚", description: "Share notes." },
 ];
 
 // --- Type Definitions ---
@@ -37,7 +37,7 @@ const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, pla
     </select>
 );
 
-// GuidedTourModal (インラインスタイルに変更)
+// GuidedTourModal (インラインスタイル)
 const GuidedTourModal: React.FC<{ 
     currentStep: number; onNext: () => void; onBack: () => void;
     onClose: () => void; onSetTab: (tabId: string) => void; totalSteps: number; 
@@ -95,6 +95,7 @@ export default function Home() {
   
   const [currentTourStep, setCurrentTourStep] = useState(-1);
   const totalTourSteps = tutorialContent.length;
+
   const [showCommentInput, setShowCommentInput] = useState({}); 
   const [commentInputs, setCommentInputs] = useState({}); 
 
@@ -167,12 +168,12 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f3f4f6', color: '#1f2937' }}>
       {/* Mobile Header */}
-      <div className="mobile-header" style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, height: '60px', background: 'white', borderBottom: '1px solid #e5e7eb', zIndex: 50, justifyContent: 'space-between', alignItems: 'center', padding: '0 16px' }}>
+      <div className="mobile-header" style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '60px', background: 'white', borderBottom: '1px solid #e5e7eb', zIndex: 50, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px' }}>
           <h1 style={{ margin: 0, fontSize: '20px', color: '#2563eb', fontWeight: 'bold' }}>GC</h1>
           <button onClick={() => setCurrentTourStep(0)} style={{ background: '#eff6ff', color: '#2563eb', padding: '4px 12px', borderRadius: '9999px', fontSize: '12px', fontWeight: 'bold', border: 'none' }}>🎓 Tutorial</button>
       </div>
 
-      <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', display: 'flex', gap: '24px', paddingTop: '20px' }}>
+      <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', display: 'flex', gap: '24px', paddingTop: '80px' }}>
         {/* PC Sidebar */}
         <nav className="sidebar" style={{ width: '250px', position: 'sticky', top: '20px', height: 'fit-content' }}>
           <div className="card" style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
@@ -245,7 +246,7 @@ export default function Home() {
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e5e7eb' }}></div>
                   <div style={{ flex: 1 }}>
-                    <textarea style={{ width: '100%', border: 'none', outline: 'none', fontSize: '16px', resize: 'none', height: '60px' }} placeholder="What's happening?" value={inputText} onChange={(e) => setInputText(e.target.value)} />
+                    <textarea className="text-input" style={{ width: '100%', border: 'none', outline: 'none', fontSize: '16px', resize: 'none', height: '60px' }} placeholder="What's happening?" value={inputText} onChange={(e) => setInputText(e.target.value)} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
                       <select style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#f9fafb' }} value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
                         <option value="question">❓ Q&A</option>
@@ -269,10 +270,10 @@ export default function Home() {
                     <p style={{ fontSize: '16px', lineHeight: '1.5', marginBottom: '16px', paddingLeft: '52px' }}>{post.content}</p>
                     <div style={{ display: 'flex', gap: '24px', paddingLeft: '52px', borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
                       <button onClick={() => handleLikeToggle(post.id)} className={`action-btn ${post.has_liked ? 'liked' : ''}`} style={{ color: post.has_liked ? '#ef4444' : '#6b7280', fontWeight: 'bold', fontSize: '14px' }}>
-                          <span>{post.has_liked ? '❤️' : '🤍'}</span> Like ({post.likes_count})
+                          <span>{post.has_liked ? '❤️' : '🤍'}</span> Like ({post.likes_count || 0})
                       </button>
                       <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} className="action-btn" style={{ fontWeight: 'bold', fontSize: '14px' }}>
-                          <span>💬</span> Comment ({post.comments.length})
+                          <span>💬</span> Comment ({post.comments.length || 0})
                       </button>
                       {userRole === 'admin' && <button onClick={() => handleDeletePost(post.id)} style={{ marginLeft: 'auto', color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Delete</button>}
                     </div>
@@ -280,16 +281,14 @@ export default function Home() {
                     {showCommentInput[post.id] && (
                         <div style={{ marginTop: '16px', paddingLeft: '52px', borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
                             <div style={{ marginBottom: '16px' }}>
-                                {post.comments.length > 0 ? (
-                                    post.comments.map(comment => (
-                                        <div key={comment.id} style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '8px', fontSize: '14px' }}>
-                                            <p style={{ margin: 0, color: '#1f2937' }}>{comment.content}</p>
-                                            <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#9ca3af' }}>{new Date(comment.created_at).toLocaleString()}</p>
-                                        </div>
-                                    ))
-                                ) : (<p style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic' }}>No comments yet.</p>)}
+                                {post.comments.map(comment => (
+                                    <div key={comment.id} style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '8px', fontSize: '14px' }}>
+                                        <p style={{ margin: 0, color: '#1f2937' }}>{comment.content}</p>
+                                        <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#9ca3af' }}>{new Date(comment.created_at).toLocaleString()}</p>
+                                    </div>
+                                ))}
                             </div>
-                            <textarea style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '14px', resize: 'none', minHeight: '60px' }} placeholder="Comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} />
+                            <textarea className="text-input" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '14px', resize: 'none', minHeight: '60px' }} placeholder="Comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} />
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                                 <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: false }))} style={{ padding: '4px 12px', borderRadius: '9999px', border: 'none', background: '#e5e7eb', color: '#4b5563', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Close</button>
                                 <button onClick={() => handleCommentSubmit(post.id)} disabled={loading || !commentInputs[post.id]} style={{ padding: '4px 12px', borderRadius: '9999px', border: 'none', background: '#2563eb', color: 'white', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Send</button>
@@ -302,7 +301,7 @@ export default function Home() {
           )}
         </main>
         <aside className="hidden xl:block w-80 sticky top-8 shrink-0">
-          <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '24px' }}>
+          <div className="card" style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', marginBottom: '16px' }}>Your Profile</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}><div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(to top right, #4ade80, #3b82f6)' }}></div><div><p style={{ fontSize: '18px', fontWeight: 'bold' }}>You ({userRole})</p><p style={{ fontSize: '12px', color: '#6b7280' }}>{session?.user.email || email}</p></div></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', textAlign: 'center', background: '#f9fafb', padding: '12px', borderRadius: '12px' }}><div><p style={{ fontSize: '18px', fontWeight: 'bold' }}>12</p><p style={{ fontSize: '12px', color: '#9ca3af' }}>Posts</p></div><div><p style={{ fontSize: '18px', fontWeight: 'bold' }}>45</p><p style={{ fontSize: '12px', color: '#9ca3af' }}>Likes</p></div><div><p style={{ fontSize: '18px', fontWeight: 'bold' }}>3</p><p style={{ fontSize: '12px', color: '#9ca3af' }}>Files</p></div></div>
@@ -316,7 +315,7 @@ export default function Home() {
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden" style={{ position: 'fixed', bottom: 0, width: '100%', background: 'white', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-around', padding: '8px 0', zIndex: 50 }}>
+      <div className="mobile-nav" style={{ display: 'none', position: 'fixed', bottom: 0, width: '100%', background: 'white', borderTop: '1px solid #e5e7eb', justifyContent: 'space-around', padding: '8px 0', zIndex: 50 }}>
           {tutorialContent.map(item => (
               <button key={item.id} onClick={() => setActiveTab(item.id)} style={{ background: 'none', border: 'none', fontSize: '24px', color: activeTab === item.id ? '#2563eb' : '#9ca3af' }}>
                   {item.icon}
