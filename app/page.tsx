@@ -18,6 +18,7 @@ const tutorialContent = [
 ];
 
 // --- Type Definitions ---
+// ★NEW: コメントの型定義
 type Comment = {
   id: string;
   content: string;
@@ -31,9 +32,11 @@ type Post = {
   type: string;
   user_email?: string;
   created_at: string;
+  
+  // 複合クエリの結果
   likes_count: number;
   has_liked: boolean;
-  comments: Comment[];
+  comments: Comment[]; // ★UPDATED: コメントの配列を持つように変更
 };
 
 type Material = {
@@ -65,32 +68,56 @@ const GuidedTourModal: React.FC<{
     totalSteps: number; 
 }> = ({ currentStep, onNext, onBack, onClose, onSetTab, totalSteps }) => {
     if (currentStep < 0) return null;
+
     const stepData = tutorialContent[currentStep];
     const isLastStep = currentStep === totalSteps - 1;
     const isFirstStep = currentStep === 0;
-    useEffect(() => { if (currentStep >= 0) onSetTab(stepData.id); }, [currentStep, stepData.id, onSetTab]);
+
+    useEffect(() => {
+        if (currentStep >= 0) {
+            onSetTab(stepData.id);
+        }
+    }, [currentStep, stepData.id, onSetTab]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 transition-opacity duration-300">
-            <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl p-6 relative border-4 border-blue-500 mx-4">
+            <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl p-6 transform transition-transform duration-300 border-4 border-blue-500 relative">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-extrabold text-blue-600">🎓 Tutorial Step {currentStep + 1}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 text-2xl font-bold">&times;</button>
+                    <h2 className="text-xl font-extrabold text-blue-600">
+                        🎓 Tutorial Step {currentStep + 1} of {totalSteps}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 text-2xl font-bold transition">
+                        &times;
+                    </button>
                 </div>
+
                 <div className="space-y-4">
                     <h3 className="text-2xl font-bold flex items-center gap-3 text-gray-800 p-2 bg-blue-100 rounded-lg">
                         <span className="text-3xl">{stepData.icon}</span> {stepData.label}
                     </h3>
                     <p className="text-gray-600 leading-relaxed pl-1">{stepData.description}</p>
                 </div>
+
                 <div className="mt-6 pt-4 border-t flex justify-between items-center">
-                    <button onClick={onBack} disabled={isFirstStep} className="bg-gray-200 text-gray-700 py-2 px-4 rounded-xl font-bold disabled:opacity-50">&larr; Back</button>
-                    <button onClick={isLastStep ? onClose : onNext} className="bg-green-600 text-white py-2 px-4 rounded-xl font-bold">{isLastStep ? 'End Tour' : 'Next Step'}</button>
+                    <button 
+                        onClick={onBack}
+                        disabled={isFirstStep}
+                        className="bg-gray-200 text-gray-700 py-2 px-4 rounded-xl font-bold hover:bg-gray-300 transition disabled:opacity-50"
+                    >
+                        &larr; Back
+                    </button>
+                    <button 
+                        onClick={isLastStep ? onClose : onNext}
+                        className="bg-green-600 text-white py-2 px-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200"
+                    >
+                        {isLastStep ? 'End Tour' : 'Next Step'}
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
+
 
 export default function Home() {
   
@@ -105,6 +132,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
+  // Material States
   const [materialTitle, setMaterialTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [materialGrade, setMaterialGrade] = useState(GRADE_OPTIONS[0]);
@@ -113,27 +141,31 @@ export default function Home() {
   const [materialDescription, setMaterialDescription] = useState(''); 
   const [uploadLanguage, setUploadLanguage] = useState(LANGUAGE_OPTIONS[0]); 
 
+  // Filter States
   const [filterLanguage, setFilterLanguage] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   
+  // Tour States
   const [currentTourStep, setCurrentTourStep] = useState(-1);
   const totalTourSteps = tutorialContent.length;
   
+  // Comment States
   const [showCommentInput, setShowCommentInput] = useState<{[key: number]: boolean}>({}); 
   const [commentInputs, setCommentInputs] = useState<{[key: number]: string}>({}); 
 
   const fetchUserRole = async () => {
     const user = (await supabase.auth.getSession()).data.session?.user;
     if (!user) { setUserRole('student'); return; }
-    const { data } = await supabase.from("users").select("role").eq("id", user.id).single();
-    if (data?.role) { setUserRole(data.role as 'student' | 'admin'); } 
-    else {
-      const { error } = await supabase.from("users").insert({ id: user.id, role: 'student' });
-      if (!error) setUserRole('student');
+    const { data, error } = await supabase.from("users").select("role").eq("id", user.id).single();
+    if (error && error.code !== 'PGRST116') { console.error("Error fetching user role:", error); }
+    if (data?.role) { setUserRole(data.role as 'student' | 'admin'); } else {
+      const { error: insertError } = await supabase.from("users").insert({ id: user.id, role: 'student' });
+      if (!insertError) { setUserRole('student'); }
     }
   };
   
+  // ★UPDATED: コメントも一緒に取得するように修正
   const fetchPosts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     const currentUserId = user ? user.id : '00000000-0000-0000-0000-000000000000'; 
@@ -149,13 +181,18 @@ export default function Home() {
             )
         `)
         .order('created_at', { ascending: false });
+        // ※ comments自体の並び替えはJS側で行います（新しい順など）
         
-    if (error) { console.error("Error fetching posts:", error); return; }
+    if (error) {
+        console.error("Error fetching posts:", error);
+        return;
+    }
     
     const formattedPosts = posts?.map((post: any) => ({
         ...post,
         likes_count: post.likes_count?.[0]?.count || 0,
         has_liked: post.user_has_liked?.[0]?.count > 0,
+        // コメントを新しい順にソート（必要であれば）
         comments: post.comments?.sort((a: Comment, b: Comment) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
     } as Post)); 
 
@@ -194,24 +231,51 @@ export default function Home() {
   };
 
   const handleLikeToggle = async (postId: number) => { 
-      if (loading || !session?.user.id) { return alert("Login required"); }
+      if (loading || !session?.user.id) {
+          alert("ログインが必要です。");
+          return;
+      }
       setLoading(true);
       try {
-          const { error } = await supabase.rpc('toggle_like', { post_id_input: postId, user_id_input: session.user.id });
-          if (error) throw error; else fetchPosts(); 
-      } catch (error: any) { alert("Error: " + error.message); } finally { setLoading(false); }
+          const { error } = await supabase.rpc('toggle_like', {
+              post_id_input: postId,
+              user_id_input: session.user.id
+          });
+          if (error) throw error;
+          else fetchPosts(); 
+      } catch (error: any) {
+          alert("いいね処理に失敗しました: " + error.message);
+      } finally {
+          setLoading(false);
+      }
   };
   
+  // ★UPDATED: コメント送信機能（DB保存）
   const handleCommentSubmit = async (postId: number) => {
       const commentContent = commentInputs[postId];
       if (!commentContent || loading || !session?.user) return;
+
       setLoading(true);
+
       try {
-          const { error } = await supabase.from("comments").insert([{ post_id: postId, user_id: session.user.id, content: commentContent }]);
+          const { error } = await supabase.from("comments").insert([{ 
+              post_id: postId, 
+              user_id: session.user.id, 
+              content: commentContent 
+          }]);
+          
           if (error) throw error;
+
+          // 送信成功
           setCommentInputs(prev => ({ ...prev, [postId]: '' }));
-          fetchPosts();
-      } catch (error: any) { alert("Error: " + error.message); } finally { setLoading(false); }
+          fetchPosts(); // 投稿一覧（とコメント）を再取得して表示を更新
+          
+      } catch (error: any) {
+          alert("コメントの送信に失敗しました: " + error.message);
+          console.error("Comment Error:", error);
+      } finally {
+          setLoading(false);
+      }
   };
 
   const handleUpload = async () => {
@@ -236,7 +300,8 @@ export default function Home() {
     try {
         const pathSegments = fileUrl.split('materials/');
         if (pathSegments.length > 1) await supabase.storage.from('materials').remove([pathSegments[1]]);
-        await supabase.from("materials").delete().eq("id", materialId); 
+        const { error: dbError } = await supabase.from("materials").delete().eq("id", materialId); 
+        if (dbError) throw new Error(dbError.message);
         alert("Deleted."); fetchMaterials();
     } catch (error: any) { alert("Failed: " + error.message); } finally { setLoading(false); }
   };
@@ -244,7 +309,12 @@ export default function Home() {
   const handlePost = async () => {
     if (!inputText || !session?.user) return;
     if (selectedType === 'news' && userRole !== 'admin') return alert("Admin only");
-    await supabase.from("posts").insert([{ content: inputText, type: selectedType, user_email: session.user.email }]);
+    
+    await supabase.from("posts").insert([{ 
+        content: inputText, 
+        type: selectedType, 
+        user_email: session.user.email
+    }]);
     setInputText("");
     fetchPosts();
   };
@@ -307,30 +377,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
-      {/* ★NEW: Mobile Header (Sticky) */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md border-b border-gray-200 z-20 h-16 flex items-center justify-between px-4 shadow-sm">
-          <h1 className="text-xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">GC</h1>
-          <button onClick={startTour} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
-              🎓 Tutorial
-          </button>
-      </div>
-
-      {/* ★NEW: Mobile Bottom Navigation (Sticky) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 flex justify-around items-center h-16 pb-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          {tutorialContent.map((item) => (
-              <button 
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex flex-col items-center justify-center w-full h-full ${activeTab === item.id ? 'text-blue-600' : 'text-gray-400'}`}
-              >
-                  <span className="text-2xl">{item.icon}</span>
-                  <span className="text-[10px] font-bold">{item.label}</span>
-              </button>
-          ))}
-      </div>
-
       <div className="max-w-7xl mx-auto flex items-start gap-8 px-4 py-8">
-        {/* PC Sidebar (Hidden on Mobile) */}
         <nav className="hidden md:block w-64 sticky top-8 shrink-0">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-8 px-2">GC</h1>
@@ -347,8 +394,7 @@ export default function Home() {
           </div>
         </nav>
 
-        {/* Main Feed (Padding added for Mobile) */}
-        <main className="flex-1 min-w-0 pt-14 pb-20 md:pt-0 md:pb-0">
+        <main className="flex-1 min-w-0">
           {activeTab === "materials" ? (
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
@@ -375,7 +421,7 @@ export default function Home() {
                     <textarea className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-20" placeholder="Description" value={materialDescription} onChange={(e) => setMaterialDescription(e.target.value)} />
                     <div className="relative pt-2">
                         <input type="file" className="hidden" id="fileUpload" onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)} /> 
-                        <label htmlFor="fileUpload" className="block w-full p-3 bg-gray-50 rounded-xl text-center text-gray-500 cursor-pointer hover:bg-gray-100 border border-dashed border-gray-300 transition">{uploadFile ? "📄 " + uploadFile.name : "📁 Select File (PDF, DOCX, etc.)"}</label>
+                        <label htmlFor="fileUpload" className="block w-full p-3 bg-gray-50 rounded-xl text-center text-gray-500 cursor-pointer hover:bg-gray-100 border border-dashed border-gray-300 transition">{uploadFile ? "📄 " + uploadFile.name : "📁 Select File"}</label>
                     </div>
                   </div>
                   <button onClick={handleUpload} disabled={loading} className="h-24 w-32 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl">{loading ? "..." : "Upload"}</button>
@@ -435,8 +481,11 @@ export default function Home() {
                       <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} className="text-gray-400 hover:text-blue-500 font-bold text-sm flex items-center gap-2 transition"><span>💬</span> Comment ({post.comments.length})</button>
                       {userRole === 'admin' && <button onClick={() => handleDeletePost(post.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition ml-auto"><span>🗑️</span> Delete</button>}
                     </div>
+                    
+                    {/* ★NEW: コメント表示・入力エリア */}
                     {showCommentInput[post.id] && (
                         <div className="mt-4 pl-13 pt-4 border-t border-gray-50">
+                            {/* コメントリスト */}
                             <div className="space-y-3 mb-4">
                                 {post.comments.length > 0 ? (
                                     post.comments.map(comment => (
@@ -445,8 +494,12 @@ export default function Home() {
                                             <p className="text-xs text-gray-400 mt-1">{new Date(comment.created_at).toLocaleString()}</p>
                                         </div>
                                     ))
-                                ) : (<p className="text-xs text-gray-400 italic">No comments yet.</p>)}
+                                ) : (
+                                    <p className="text-xs text-gray-400 italic">No comments yet.</p>
+                                )}
                             </div>
+                            
+                            {/* 入力フォーム */}
                             <textarea className="w-full bg-gray-50 p-3 rounded-lg text-sm outline-none resize-none" placeholder="Write a comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} rows={2} />
                             <button onClick={() => handleCommentSubmit(post.id)} disabled={loading || !commentInputs[post.id]} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded-full text-sm font-bold float-right">Send</button>
                             <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: false }))} className="mt-2 mr-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-1 rounded-full text-sm font-bold float-right">Close</button>
