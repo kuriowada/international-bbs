@@ -8,6 +8,15 @@ const GRADE_OPTIONS = ['Year 12', 'Year 11', 'Year 10'];
 const SUBJECT_OPTIONS = ['Math', 'English']; 
 const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
+// チュートリアルコンテンツ (アイコンを分離し、データ構造を修正)
+const tutorialContent = [
+    { id: "all", label: "Home", icon: "🏠", description: "すべてのアクティビティ（Q&A、Tips、News）が時系列で表示されます。現在のキャンパスの雰囲気を把握できます。" },
+    { id: "question", label: "Q&A", icon: "❓", description: "学業や留学生活で困ったことがあれば、質問を投稿して他の学生からアドバイスをもらうことができます。" },
+    { id: "tip", label: "Tips", icon: "💡", description: "勉強法、生活の知恵、隠れた情報など、知っておくと役立つ経験談やコツを共有できます。" }, 
+    { id: "news", label: "News", icon: "📢", description: "管理者のみが投稿可能。イベント情報、学校からのお知らせ、重要な更新情報を確認できます。" },
+    { id: "materials", label: "Materials", icon: "📚", description: "自分の言語のノート、過去問、参考資料などを検索したり、他の学生と共有したりすることができます。" },
+];
+
 // --- Type Definitions ---
 type Post = {
   id: number;
@@ -28,7 +37,7 @@ type Material = {
   language?: string; 
 };
 
-// SelectInput コンポーネントのプロパティ型定義
+// SelectInput コンポーネントのプロパティ型定義 (TypeScript修正)
 interface SelectInputProps {
     value: string;
     onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
@@ -36,11 +45,48 @@ interface SelectInputProps {
     placeholder: string;
 }
 
+// ★ NEW COMPONENT: チュートリアルモーダル
+const TutorialModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 transition-opacity duration-300">
+            <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-8 transform scale-100 transition-transform duration-300">
+                <div className="flex justify-between items-center mb-6 border-b pb-4">
+                    <h2 className="text-3xl font-extrabold text-blue-600">🎓 Global Campus チュートリアル</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition">
+                        &times;
+                    </button>
+                </div>
+
+                <div className="space-y-6">
+                    <p className="text-gray-600 leading-relaxed">Global Campusへようこそ！左側のナビゲーションを使って、各タブの目的を理解しましょう。</p>
+                    
+                    {tutorialContent.map((item, index) => (
+                        <div key={item.id} className={`p-4 rounded-xl ${index % 2 === 0 ? 'bg-blue-50' : 'bg-gray-50'} border border-gray-100`}>
+                            <h3 className="text-lg font-bold flex items-center gap-2 mb-1 text-gray-800">
+                                <span className="text-xl">{item.icon}</span> {item.label} {/* ★修正済 */}
+                            </h3>
+                            <p className="text-gray-600 text-sm pl-7">{item.description}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-8 flex justify-end">
+                    <button 
+                        onClick={onClose}
+                        className="bg-blue-600 text-white py-3 px-6 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200"
+                    >
+                        OK、理解しました
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 export default function Home() {
-  // --- Configuration ---
-  const GRADE_OPTIONS = ['Year 12', 'Year 11', 'Year 10'];
-  const SUBJECT_OPTIONS = ['Math', 'English']; 
-  const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
   
   // --- State Management ---
   const [session, setSession] = useState<any>(null);
@@ -67,6 +113,9 @@ export default function Home() {
   const [filterLanguage, setFilterLanguage] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
+  
+  // NEW STATE: チュートリアルモーダルの開閉
+  const [showTutorial, setShowTutorial] = useState(false);
 
 
   // --- Data Fetching Functions ---
@@ -88,6 +137,7 @@ export default function Home() {
   const fetchMaterials = async () => {
     let query = supabase.from("materials").select("*").order("created_at", { ascending: false });
     
+    // フィルタリングロジックの適用
     if (filterLanguage && filterLanguage !== 'All Languages') {
         query = query.eq('language', filterLanguage);
     }
@@ -177,27 +227,22 @@ export default function Home() {
     }
   };
   
-  // ★ NEW FUNCTION: ファイルとDBレコードを削除する
   const handleDeleteMaterial = async (materialId: number, fileUrl: string) => {
     if (!window.confirm("Are you sure you want to delete this material and its file?")) { return; }
     
     setLoading(true);
     
     try {
-        // 1. Supabase Storageのファイルパスを抽出 (URLからバケット名以降の部分を抽出)
         const pathSegments = fileUrl.split('materials/');
         const filePath = pathSegments.length > 1 ? pathSegments[1] : null;
 
         if (filePath) {
-            // 2. Storageからファイルを削除 (RLSによりadminのみ許可される)
             const { error: storageError } = await supabase.storage.from('materials').remove([filePath]);
             if (storageError && storageError.message !== 'File not found') {
-                // ファイルが見つからないエラーは許容するが、それ以外のエラーは表示する
                 throw new Error(`Storage Deletion Failed: ${storageError.message}`);
             }
         }
         
-        // 3. データベースのレコードを削除
         const { error: dbError } = await supabase.from("materials").delete().eq("id", materialId); 
         if (dbError) {
              throw new Error(`DB Deletion Failed: ${dbError.message}`);
@@ -340,13 +385,7 @@ export default function Home() {
               GC
             </h1>
             <ul className="space-y-2">
-              {[
-                { id: "all", label: "Home", icon: "🏠" },
-                { id: "question", label: "Q&A", icon: "❓" },
-                { id: "tip", label: "Tips", icon: "💡" }, 
-                { id: "news", label: "News", icon: "📢" },
-                { id: "materials", label: "Materials", icon: "📚" },
-              ].map((item) => (
+              {tutorialContent.map((item) => (
                 <li key={item.id}>
                   <button
                     onClick={() => setActiveTab(item.id)}
@@ -614,11 +653,23 @@ export default function Home() {
             <p className="text-sm opacity-90 leading-relaxed mb-4">
               This is the desktop version of Global Campus. Use the left menu to navigate.
             </p>
-            <button className="w-full bg-white text-indigo-600 py-2 rounded-lg font-bold text-sm">Learn More</button>
+            {/* ★修正ポイント: Learn More ボタンの挙動を変更 */}
+            <button 
+                onClick={() => setShowTutorial(true)} 
+                className="w-full bg-white text-indigo-600 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition"
+            >
+                Learn More (Tutorial)
+            </button>
           </div>
         </aside>
 
       </div>
+      
+      {/* ★NEW COMPONENT: チュートリアルモーダル */}
+      <TutorialModal 
+          isOpen={showTutorial} 
+          onClose={() => setShowTutorial(false)} 
+      />
     </div>
   );
 }
