@@ -8,13 +8,13 @@ const GRADE_OPTIONS = ['Year 12', 'Year 11', 'Year 10'];
 const SUBJECT_OPTIONS = ['Math', 'English']; 
 const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
-// チュートリアルコンテンツ (アイコンを分離し、データ構造を修正)
+// ★ TUTORIAL DATA STRUCTURE (USED for STEPPER)
 const tutorialContent = [
-    { id: "all", label: "Home", icon: "🏠", description: "すべてのアクティビティ（Q&A、Tips、News）が時系列で表示されます。現在のキャンパスの雰囲気を把握できます。" },
-    { id: "question", label: "Q&A", icon: "❓", description: "学業や留学生活で困ったことがあれば、質問を投稿して他の学生からアドバイスをもらうことができます。" },
-    { id: "tip", label: "Tips", icon: "💡", description: "勉強法、生活の知恵、隠れた情報など、知っておくと役立つ経験談やコツを共有できます。" }, 
-    { id: "news", label: "News", icon: "📢", description: "管理者のみが投稿可能。イベント情報、学校からのお知らせ、重要な更新情報を確認できます。" },
-    { id: "materials", label: "Materials", icon: "📚", description: "自分の言語のノート、過去問、参考資料などを検索したり、他の学生と共有したりすることができます。" },
+    { id: "all", label: "Home", icon: "🏠", description: "This is where you see all activity (Q&A, Tips, News) in chronological order. It provides a full overview of the campus feed." },
+    { id: "question", label: "Q&A", icon: "❓", description: "Use this tab to ask questions when you encounter academic or lifestyle issues, and get advice from other students." },
+    { id: "tip", label: "Tips", icon: "💡", description: "Share and find helpful experiences, study methods, and essential tips that others should know." }, 
+    { id: "news", label: "News", icon: "📢", description: "This is for administrators only. Check here for event announcements, school notices, and important updates." },
+    { id: "materials", label: "Materials", icon: "📚", description: "You can search for and share study notes, past exams, and reference materials specific to your language." },
 ];
 
 // --- Type Definitions ---
@@ -37,7 +37,7 @@ type Material = {
   language?: string; 
 };
 
-// SelectInput コンポーネントのプロパティ型定義 (TypeScript修正)
+// SelectInput Component Props
 interface SelectInputProps {
     value: string;
     onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
@@ -45,39 +45,60 @@ interface SelectInputProps {
     placeholder: string;
 }
 
-// ★ NEW COMPONENT: チュートリアルモーダル
-const TutorialModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-    if (!isOpen) return null;
+// ★ NEW COMPONENT: GUIDED TOUR MODAL
+const GuidedTourModal: React.FC<{ 
+    currentStep: number; 
+    onNext: () => void; 
+    onBack: () => void;
+    onClose: () => void; 
+    onSetTab: (tabId: string) => void;
+    totalSteps: number; 
+}> = ({ currentStep, onNext, onBack, onClose, onSetTab, totalSteps }) => {
+    if (currentStep < 0) return null;
+
+    const stepData = tutorialContent[currentStep];
+    const isLastStep = currentStep === totalSteps - 1;
+    const isFirstStep = currentStep === 0;
+
+    // Simulate navigation by setting the active tab to the current step's tab
+    useEffect(() => {
+        if (currentStep >= 0) {
+            onSetTab(stepData.id);
+        }
+    }, [currentStep, stepData.id, onSetTab]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 transition-opacity duration-300">
-            <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-8 transform scale-100 transition-transform duration-300">
-                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 className="text-3xl font-extrabold text-blue-600">🎓 Global Campus チュートリアル</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-bold transition">
+            <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl p-6 transform transition-transform duration-300 border-4 border-blue-500 relative">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-extrabold text-blue-600">
+                        🎓 Tutorial Step {currentStep + 1} of {totalSteps}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-600 text-2xl font-bold transition">
                         &times;
                     </button>
                 </div>
 
-                <div className="space-y-6">
-                    <p className="text-gray-600 leading-relaxed">Global Campusへようこそ！左側のナビゲーションを使って、各タブの目的を理解しましょう。</p>
-                    
-                    {tutorialContent.map((item, index) => (
-                        <div key={item.id} className={`p-4 rounded-xl ${index % 2 === 0 ? 'bg-blue-50' : 'bg-gray-50'} border border-gray-100`}>
-                            <h3 className="text-lg font-bold flex items-center gap-2 mb-1 text-gray-800">
-                                <span className="text-xl">{item.icon}</span> {item.label} {/* ★修正済 */}
-                            </h3>
-                            <p className="text-gray-600 text-sm pl-7">{item.description}</p>
-                        </div>
-                    ))}
+                <div className="space-y-4">
+                    <h3 className="text-2xl font-bold flex items-center gap-3 text-gray-800 p-2 bg-blue-100 rounded-lg">
+                        <span className="text-3xl">{stepData.icon}</span> {stepData.label}
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed pl-1">{stepData.description}</p>
                 </div>
 
-                <div className="mt-8 flex justify-end">
+                <div className="mt-6 pt-4 border-t flex justify-between items-center">
                     <button 
-                        onClick={onClose}
-                        className="bg-blue-600 text-white py-3 px-6 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200"
+                        onClick={onBack}
+                        disabled={isFirstStep}
+                        className="bg-gray-200 text-gray-700 py-2 px-4 rounded-xl font-bold hover:bg-gray-300 transition disabled:opacity-50"
                     >
-                        OK、理解しました
+                        &larr; Back
+                    </button>
+                    <button 
+                        onClick={isLastStep ? onClose : onNext}
+                        className="bg-green-600 text-white py-2 px-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200"
+                    >
+                        {isLastStep ? 'End Tour' : 'Next Step &rarr;'}
                     </button>
                 </div>
             </div>
@@ -114,8 +135,9 @@ export default function Home() {
   const [filterGrade, setFilterGrade] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   
-  // NEW STATE: チュートリアルモーダルの開閉
-  const [showTutorial, setShowTutorial] = useState(false);
+  // ★NEW GUIDED TOUR STATES
+  const [currentTourStep, setCurrentTourStep] = useState(-1);
+  const totalTourSteps = tutorialContent.length;
 
 
   // --- Data Fetching Functions ---
@@ -320,6 +342,15 @@ export default function Home() {
         ))}
     </select>
   );
+  
+  // --- Guided Tour Controls ---
+  const startTour = () => setCurrentTourStep(0);
+  const nextStep = () => setCurrentTourStep(prev => Math.min(prev + 1, totalTourSteps - 1));
+  const backStep = () => setCurrentTourStep(prev => Math.max(prev - 1, 0));
+  const endTour = () => {
+      setCurrentTourStep(-1);
+      setActiveTab('all'); // ツアー終了時はHomeに戻す
+  }
 
   // ==========================================
   // ▼▼▼ VIEW (JSX) ▼▼▼
@@ -385,7 +416,7 @@ export default function Home() {
               GC
             </h1>
             <ul className="space-y-2">
-              {tutorialContent.map((item) => (
+              {tutorialContent.map((item, index) => (
                 <li key={item.id}>
                   <button
                     onClick={() => setActiveTab(item.id)}
@@ -393,7 +424,9 @@ export default function Home() {
                       activeTab === item.id
                         ? "bg-blue-50 text-blue-600"
                         : "text-gray-500 hover:bg-gray-50"
-                    }`}
+                    }
+                    ${currentTourStep === index ? 'border-2 border-red-500 ring-2 ring-red-300 shadow-lg' : ''} // ★ツアー中のハイライト
+                    `}
                   >
                     <span className="text-xl">{item.icon}</span> {item.label}
                   </button>
@@ -655,7 +688,7 @@ export default function Home() {
             </p>
             {/* ★修正ポイント: Learn More ボタンの挙動を変更 */}
             <button 
-                onClick={() => setShowTutorial(true)} 
+                onClick={startTour} 
                 className="w-full bg-white text-indigo-600 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition"
             >
                 Learn More (Tutorial)
@@ -666,9 +699,13 @@ export default function Home() {
       </div>
       
       {/* ★NEW COMPONENT: チュートリアルモーダル */}
-      <TutorialModal 
-          isOpen={showTutorial} 
-          onClose={() => setShowTutorial(false)} 
+      <GuidedTourModal 
+          currentStep={currentTourStep} 
+          onNext={nextStep} 
+          onBack={backStep}
+          onClose={endTour}
+          onSetTab={setActiveTab}
+          totalSteps={totalTourSteps}
       />
     </div>
   );
