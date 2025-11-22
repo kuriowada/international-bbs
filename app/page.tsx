@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState, ChangeEvent, SelectHTMLAttributes } from "react"; // ★ChangeEvent, SelectHTMLAttributesをインポート
+import { useEffect, useState, ChangeEvent, SelectHTMLAttributes } from "react";
 import { supabase } from "@/lib/supabaseClient";
+
+// --- Configuration ---
+const GRADE_OPTIONS = ['Year 12', 'Year 11', 'Year 10'];
+const SUBJECT_OPTIONS = ['Math', 'English']; 
+const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
 // --- Type Definitions ---
 type Post = {
@@ -23,10 +28,10 @@ type Material = {
   language?: string; 
 };
 
-// ★NEW★ SelectInput コンポーネントのプロパティ型定義
+// SelectInput コンポーネントのプロパティ型定義
 interface SelectInputProps {
     value: string;
-    onChange: (e: ChangeEvent<HTMLSelectElement>) => void; // select要素の変更イベントに型を指定
+    onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
     options: string[];
     placeholder: string;
 }
@@ -83,7 +88,6 @@ export default function Home() {
   const fetchMaterials = async () => {
     let query = supabase.from("materials").select("*").order("created_at", { ascending: false });
     
-    // フィルタリングロジックの適用
     if (filterLanguage && filterLanguage !== 'All Languages') {
         query = query.eq('language', filterLanguage);
     }
@@ -172,6 +176,44 @@ export default function Home() {
       setLoading(false);
     }
   };
+  
+  // ★ NEW FUNCTION: ファイルとDBレコードを削除する
+  const handleDeleteMaterial = async (materialId: number, fileUrl: string) => {
+    if (!window.confirm("Are you sure you want to delete this material and its file?")) { return; }
+    
+    setLoading(true);
+    
+    try {
+        // 1. Supabase Storageのファイルパスを抽出 (URLからバケット名以降の部分を抽出)
+        const pathSegments = fileUrl.split('materials/');
+        const filePath = pathSegments.length > 1 ? pathSegments[1] : null;
+
+        if (filePath) {
+            // 2. Storageからファイルを削除 (RLSによりadminのみ許可される)
+            const { error: storageError } = await supabase.storage.from('materials').remove([filePath]);
+            if (storageError && storageError.message !== 'File not found') {
+                // ファイルが見つからないエラーは許容するが、それ以外のエラーは表示する
+                throw new Error(`Storage Deletion Failed: ${storageError.message}`);
+            }
+        }
+        
+        // 3. データベースのレコードを削除
+        const { error: dbError } = await supabase.from("materials").delete().eq("id", materialId); 
+        if (dbError) {
+             throw new Error(`DB Deletion Failed: ${dbError.message}`);
+        }
+
+        alert("Material successfully deleted.");
+        fetchMaterials();
+        
+    } catch (error: any) {
+        alert("Deletion Failed: " + error.message);
+        console.error("Deletion Error:", error);
+    } finally {
+        setLoading(false);
+    }
+  };
+
 
   const handlePost = async () => {
     if (!inputText) return;
@@ -217,19 +259,18 @@ export default function Home() {
     }
   };
   
-  // ★SelectInput コンポーネントの型を修正
+  // SelectInput コンポーネント (型修正済み)
   const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, placeholder }) => (
     <select
         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
         value={value}
         onChange={onChange}
     >
-        {/* 'All...'オプションが選択された場合、値が空になるように設定 */}
+        {/* All/Selectプレースホルダーの処理 */}
         {placeholder.startsWith('All') && <option value="">{placeholder}</option>}
-        {/* 通常のプレースホルダーは、値を持っていないことを保証するためにdisabled={true}にするのがベストだが、ここではフィルタリングのために値を空にする */}
         {!placeholder.startsWith('All') && <option value="" disabled>{placeholder}</option>}
         
-        {options.map((opt: string) => ( // ★optにstring型を指定
+        {options.map((opt: string) => ( 
             <option key={opt} value={opt}>{opt}</option>
         ))}
     </select>
@@ -342,21 +383,21 @@ export default function Home() {
                       {/* 言語フィルター */}
                       <SelectInput 
                           value={filterLanguage} 
-                          onChange={(e) => setFilterLanguage(e.target.value)} 
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterLanguage(e.target.value)} 
                           options={['All Languages', ...LANGUAGE_OPTIONS]}
                           placeholder="All Languages"
                       />
                       {/* 学年フィルター */}
                       <SelectInput 
                           value={filterGrade} 
-                          onChange={(e) => setFilterGrade(e.target.value)} 
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterGrade(e.target.value)} 
                           options={['All Grades', ...GRADE_OPTIONS]}
                           placeholder="All Grades"
                       />
                       {/* 教科フィルター */}
                       <SelectInput 
                           value={filterSubject} 
-                          onChange={(e) => setFilterSubject(e.target.value)} 
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterSubject(e.target.value)} 
                           options={['All Subjects', ...SUBJECT_OPTIONS]}
                           placeholder="All Subjects"
                       />
@@ -377,20 +418,20 @@ export default function Home() {
                       className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
                       placeholder="Title of Document (e.g., N2 Grammar Notes)"
                       value={materialTitle}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setMaterialTitle(e.target.value)} // ★型修正
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setMaterialTitle(e.target.value)}
                     />
                     
                     {/* ★言語と学年のドロップダウン */}
                     <div className="grid grid-cols-2 gap-3">
                          <SelectInput 
                             value={uploadLanguage} 
-                            onChange={(e) => setUploadLanguage(e.target.value)} 
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setUploadLanguage(e.target.value)} 
                             options={LANGUAGE_OPTIONS}
                             placeholder="Select Language"
                         />
                         <SelectInput 
                             value={materialGrade} 
-                            onChange={(e) => setMaterialGrade(e.target.value)} 
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setMaterialGrade(e.target.value)} 
                             options={GRADE_OPTIONS}
                             placeholder="Select Grade"
                         />
@@ -400,7 +441,7 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-3">
                          <SelectInput 
                             value={materialSubject} 
-                            onChange={(e) => setMaterialSubject(e.target.value)} 
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setMaterialSubject(e.target.value)} 
                             options={SUBJECT_OPTIONS}
                             placeholder="Select Subject"
                         />
@@ -409,7 +450,7 @@ export default function Home() {
                             className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
                             placeholder="Unit/Topic (e.g., Adjectives)"
                             value={materialUnit}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setMaterialUnit(e.target.value)} // ★型修正
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setMaterialUnit(e.target.value)}
                         />
                     </div>
 
@@ -418,12 +459,11 @@ export default function Home() {
                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none resize-none h-20"
                         placeholder="Description (Optional)"
                         value={materialDescription}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setMaterialDescription(e.target.value)} // ★型修正
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setMaterialDescription(e.target.value)}
                     />
 
                     {/* ファイル選択 */}
                     <div className="relative pt-2">
-                        {/* ★HTMLInputElementに型を適用 */}
                         <input type="file" className="hidden" id="fileUpload" onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadFile(e.target.files ? e.target.files[0] : null)} /> 
                         <label htmlFor="fileUpload" className="block w-full p-3 bg-gray-50 rounded-xl text-center text-gray-500 cursor-pointer hover:bg-gray-100 border border-dashed border-gray-300 transition">
                           {uploadFile ? "📄 " + uploadFile.name : "📁 Select File (PDF, DOCX, etc.)"}
@@ -443,7 +483,6 @@ export default function Home() {
                     <div className="h-48 bg-gray-100 relative overflow-hidden flex items-center justify-center">
                       <div className="flex flex-col items-center justify-center text-center p-3">
                          <span className="text-5xl text-gray-300 mb-2">📄</span>
-                         {/* ★NEW TAGS */}
                          {mat.language && <span className="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-1 rounded-full">{mat.language}</span>}
                          {(mat.grade || mat.subject) && <span className="bg-green-50 text-green-600 text-xs font-bold px-2 py-1 rounded-full mt-1">{mat.grade} / {mat.subject}</span>}
                       </div>
@@ -453,10 +492,21 @@ export default function Home() {
                     </div>
                     <div className="p-4 bg-white relative z-10">
                       <h3 className="font-bold text-gray-800 truncate" title={mat.title}>{mat.title}</h3>
-                      {/* ★単元と説明を追加 */}
                       {mat.unit && <p className="text-xs text-gray-600 mt-1 truncate" title={`Unit: ${mat.unit}`}>Unit: {mat.unit}</p>}
                       {mat.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{mat.description}</p>}
                       <p className="text-xs text-gray-400 mt-1">Shared by user</p>
+                      
+                      {/* ★管理者のみに削除ボタンを追加 */}
+                      {userRole === 'admin' && (
+                          <button 
+                              onClick={() => handleDeleteMaterial(mat.id, mat.file_url)}
+                              className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition mt-2 border-t pt-2 w-full justify-center"
+                              disabled={loading}
+                          >
+                              <span>🗑️</span> Delete Material
+                          </button>
+                      )}
+                      
                     </div>
                   </div>
                 ))}
@@ -474,14 +524,14 @@ export default function Home() {
                       className="w-full bg-transparent text-lg outline-none placeholder-gray-400 resize-none h-20"
                       placeholder="What's happening on campus?"
                       value={inputText}
-                      onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setInputText(e.target.value)} // ★型修正
+                      onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setInputText(e.target.value)}
                     />
                     <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                       <div className="flex gap-2">
                           <select
                             className="bg-gray-50 px-3 py-2 rounded-lg text-sm font-bold text-gray-600 outline-none cursor-pointer hover:bg-gray-100 transition"
                             value={selectedType}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedType(e.target.value)} // ★型修正
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedType(e.target.value)}
                           >
                             <option value="question">❓ Q&A</option>
                             {userRole === 'admin' ? (
@@ -547,7 +597,7 @@ export default function Home() {
             <div className="flex items-center gap-4 mb-4">
                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-green-400 to-blue-500"></div>
                <div>
-                  <p className="font-bold text-lg">You ({userRole})</p> {/* ★役割の表示 */}
+                  <p className="font-bold text-lg">You ({userRole})</p> 
                   <p className="text-xs text-gray-500">{session?.user.email || email}</p>
                </div>
             </div>
