@@ -46,7 +46,6 @@ export default function Home() {
 
 
   // --- Data Fetching Functions ---
-  // (fetchUserRole, fetchPosts, fetchMaterials は変更なし)
   const fetchUserRole = async () => {
     const user = (await supabase.auth.getSession()).data.session?.user;
     if (!user) { setUserRole('student'); return; }
@@ -99,7 +98,6 @@ export default function Home() {
     if (error) alert(error.message);
   };
 
-  // ★handleUpload 修正: 新しいメタデータを含める
   const handleUpload = async () => {
     if (!uploadFile || !materialTitle || !materialSubject) return alert("Please fill in the Title, File, and Subject fields.");
     setLoading(true);
@@ -109,7 +107,6 @@ export default function Home() {
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from("materials").getPublicUrl(fileName);
       
-      // ★データベースへの INSERT 処理を更新
       const { error: dbError } = await supabase.from("materials").insert([{ 
         title: materialTitle, 
         file_url: publicUrl, 
@@ -122,7 +119,6 @@ export default function Home() {
       if (dbError) throw dbError;
       
       alert("Upload successful!");
-      // ★Stateをリセット
       setMaterialTitle("");
       setUploadFile(null);
       setMaterialGrade('');
@@ -248,6 +244,7 @@ export default function Home() {
               {[
                 { id: "all", label: "Home", icon: "🏠" },
                 { id: "question", label: "Q&A", icon: "❓" },
+                { id: "tip", label: "Tips", icon: "💡" }, // ★Tipsタブを追加
                 { id: "news", label: "News", icon: "📢" },
                 { id: "materials", label: "Materials", icon: "📚" },
               ].map((item) => (
