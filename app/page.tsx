@@ -24,8 +24,8 @@ type Post = {
   type: string;
   user_email?: string;
   created_at: string;
-  likes_count?: number; // UPDATED: いいね数
-  comments_count?: number; // UPDATED: コメント数 (現在は常に0またはundefined)
+  // likes_countとcomments_countは一旦削除（DB変更に対応）
+  comments_count?: number; 
 };
 
 type Material = {
@@ -158,9 +158,10 @@ export default function Home() {
     }
   };
   
-  // ★FIXED: コメント集計クエリを削除してコンパイルエラーを解消
+  // ★UPDATED: likes_countの取得を削除
   const fetchPosts = async () => {
-    const { data } = await supabase.from("posts").select("*, likes_count").order("created_at", { ascending: false }); 
+    // likes_countカラムを削除したため、単に全て(*)を取得するように変更
+    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false }); 
     if (data) setPosts(data);
   };
   
@@ -219,23 +220,36 @@ export default function Home() {
     if (error) alert(error.message);
   };
 
-  // ★NEW: いいね機能の実装
-  const handleLike = async (postId: number, currentLikes: number = 0) => {
-      if (loading) return;
+  // ★UPDATED: いいね機能の実装 (likesテーブルに挿入)
+  const handleLike = async (postId: number) => { // currentLikes引数は削除
+      if (loading || !session?.user.id) return;
       setLoading(true);
       
-      const { error } = await supabase
-          .from("posts")
-          .update({ likes_count: currentLikes + 1 })
-          .eq("id", postId);
+      try {
+          const { error } = await supabase
+              .from("likes") // ★ likes テーブルに挿入
+              .insert({ 
+                  post_id: postId,
+                  user_id: session.user.id // ★ ログインユーザーのIDを使用
+              });
 
-      if (error) {
+          if (error) {
+              // 複合主キー違反 (23505)は、既にいいね済みという意味なので、エラーではない
+              if (error.code === '23505') {
+                  alert("既にこの投稿に「いいね」しています。");
+              } else {
+                  throw error; // その他のエラーは投げる
+              }
+          } else {
+              // 成功したら投稿一覧を再取得
+              fetchPosts(); 
+          }
+      } catch (error: any) {
           alert("いいねに失敗しました。RLSポリシーを確認してください: " + error.message);
           console.error("Like Error:", error);
-      } else {
-          fetchPosts(); 
+      } finally {
+          setLoading(false);
       }
-      setLoading(false);
   };
   
   // ★NEW: コメント送信機能の準備 (仮実装)
@@ -330,8 +344,8 @@ export default function Home() {
         alert("You do not have permission to post News.");
         return;
     }
-    // likes_countを0として明示的に設定
-    await supabase.from("posts").insert([{ content: inputText, type: selectedType, likes_count: 0, comments_count: 0 }]);
+    // likes_countを削除したため、likes_count: 0の記述を削除
+    await supabase.from("posts").insert([{ content: inputText, type: selectedType, comments_count: 0 }]);
     setInputText("");
     fetchPosts();
   };
@@ -682,13 +696,13 @@ export default function Home() {
                     
                     {/* ★UPDATED: いいねとコメントのボタン */}
                     <div className="flex gap-6 mt-6 pl-13 border-t border-gray-50 pt-4">
-                      {/* いいねボタン (いいね数表示とカウントアップ機能) */}
+                      {/* いいねボタン (いいね数表示とカウントアップ機能) - likes_countは一時的に削除 */}
                       <button 
-                          onClick={() => handleLike(post.id, post.likes_count)}
+                          onClick={() => handleLike(post.id)}
                           className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition"
                           disabled={loading}
                       >
-                          <span>❤️</span> Like ({post.likes_count || 0})
+                          <span>❤️</span> Like (N/A)
                       </button>
                       
                       {/* コメントボタン (入力欄の表示/非表示をトグル) */}
