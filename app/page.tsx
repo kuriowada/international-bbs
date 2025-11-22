@@ -24,6 +24,8 @@ type Post = {
   type: string;
   user_email?: string;
   created_at: string;
+  likes_count?: number; // UPDATED: いいね数
+  comments_count?: number; // UPDATED: コメント数 (現在は常に0またはundefined)
 };
 
 type Material = {
@@ -98,7 +100,7 @@ const GuidedTourModal: React.FC<{
                         onClick={isLastStep ? onClose : onNext}
                         className="bg-green-600 text-white py-2 px-4 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200"
                     >
-                        {isLastStep ? 'End Tour' : 'Next Step'} {/* ★修正点: テキストを'Next Step'に修正 */}
+                        {isLastStep ? 'End Tour' : 'Next Step'}
                     </button>
                 </div>
             </div>
@@ -138,6 +140,10 @@ export default function Home() {
   // NEW GUIDED TOUR STATES
   const [currentTourStep, setCurrentTourStep] = useState(-1);
   const totalTourSteps = tutorialContent.length;
+  
+  // ★NEW STATES for Comment Feature
+  const [showCommentInput, setShowCommentInput] = useState<{[key: number]: boolean}>({}); 
+  const [commentInputs, setCommentInputs] = useState<{[key: number]: string}>({}); 
 
 
   // --- Data Fetching Functions ---
@@ -151,8 +157,10 @@ export default function Home() {
       if (!insertError) { setUserRole('student'); }
     }
   };
+  
+  // ★FIXED: コメント集計クエリを削除してコンパイルエラーを解消
   const fetchPosts = async () => {
-    const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("posts").select("*, likes_count").order("created_at", { ascending: false }); 
     if (data) setPosts(data);
   };
   
@@ -210,6 +218,41 @@ export default function Home() {
     });
     if (error) alert(error.message);
   };
+
+  // ★NEW: いいね機能の実装
+  const handleLike = async (postId: number, currentLikes: number = 0) => {
+      if (loading) return;
+      setLoading(true);
+      
+      const { error } = await supabase
+          .from("posts")
+          .update({ likes_count: currentLikes + 1 })
+          .eq("id", postId);
+
+      if (error) {
+          alert("いいねに失敗しました。RLSポリシーを確認してください: " + error.message);
+          console.error("Like Error:", error);
+      } else {
+          fetchPosts(); 
+      }
+      setLoading(false);
+  };
+  
+  // ★NEW: コメント送信機能の準備 (仮実装)
+  const handleCommentSubmit = async (postId: number) => {
+      const commentContent = commentInputs[postId];
+      if (!commentContent || loading) return;
+
+      setLoading(true);
+
+      // DBへの保存処理は、Supabaseでコメントテーブルを作成後に実装してください。
+      alert(`【コメントを送信】投稿ID: ${postId} / 内容: "${commentContent}" を送信しました。`);
+      
+      setCommentInputs(prev => ({ ...prev, [postId]: '' }));
+      setShowCommentInput(prev => ({ ...prev, [postId]: false }));
+      setLoading(false);
+  };
+
 
   const handleUpload = async () => {
     if (!uploadFile || !materialTitle || !materialSubject || !materialGrade || !uploadLanguage) return alert("Please fill in the Title, File, Subject, Grade, and Language fields.");
@@ -287,7 +330,8 @@ export default function Home() {
         alert("You do not have permission to post News.");
         return;
     }
-    await supabase.from("posts").insert([{ content: inputText, type: selectedType }]);
+    // likes_countを0として明示的に設定
+    await supabase.from("posts").insert([{ content: inputText, type: selectedType, likes_count: 0, comments_count: 0 }]);
     setInputText("");
     fetchPosts();
   };
@@ -621,7 +665,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Feed List (削除ボタン表示の権限チェックあり) */}
+              {/* Feed List (いいね・コメント機能を追加) */}
               {posts.filter(p => activeTab === "all" || p.type === activeTab).map((post) => (
                 <div key={post.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition">
                     <div className="flex justify-between items-start mb-4">
@@ -635,12 +679,24 @@ export default function Home() {
                       {getTypeBadge(post.type)}
                     </div>
                     <p className="text-gray-800 text-lg leading-relaxed pl-13">{post.content}</p>
+                    
+                    {/* ★UPDATED: いいねとコメントのボタン */}
                     <div className="flex gap-6 mt-6 pl-13 border-t border-gray-50 pt-4">
-                      <button className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition">
-                        <span>❤️</span> Like
+                      {/* いいねボタン (いいね数表示とカウントアップ機能) */}
+                      <button 
+                          onClick={() => handleLike(post.id, post.likes_count)}
+                          className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition"
+                          disabled={loading}
+                      >
+                          <span>❤️</span> Like ({post.likes_count || 0})
                       </button>
-                      <button className="text-gray-400 hover:text-blue-500 font-bold text-sm flex items-center gap-2 transition">
-                        <span>💬</span> Comment
+                      
+                      {/* コメントボタン (入力欄の表示/非表示をトグル) */}
+                      <button 
+                          onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} 
+                          className="text-gray-400 hover:text-blue-500 font-bold text-sm flex items-center gap-2 transition"
+                      >
+                          <span>💬</span> Comment ({post.comments_count || 0})
                       </button>
                       
                       {/* ★管理者のみに削除ボタンを表示 */}
@@ -654,6 +710,33 @@ export default function Home() {
                           </button>
                       )}
                     </div>
+                    
+                    {/* ★NEW: コメント入力欄 */}
+                    {showCommentInput[post.id] && (
+                        <div className="mt-4 pl-13 pt-4 border-t border-gray-50">
+                            <textarea
+                                className="w-full bg-gray-50 p-3 rounded-lg text-sm outline-none resize-none"
+                                placeholder="コメントを入力..."
+                                value={commentInputs[post.id] || ''}
+                                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                rows={2}
+                            />
+                            <button 
+                                onClick={() => handleCommentSubmit(post.id)}
+                                disabled={loading || !commentInputs[post.id]}
+                                className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded-full text-sm font-bold transition float-right"
+                            >
+                                コメントを送信
+                            </button>
+                            <button 
+                                onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: false }))} 
+                                className="mt-2 mr-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-1 rounded-full text-sm font-bold transition float-right"
+                            >
+                                キャンセル
+                            </button>
+                            <div className="clear-both"></div>
+                        </div>
+                    )}
                 </div>
               ))}
             </div>
