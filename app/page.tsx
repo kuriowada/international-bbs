@@ -18,17 +18,25 @@ const tutorialContent = [
 ];
 
 // --- Type Definitions ---
+// ★NEW: コメントの型定義
+type Comment = {
+  id: string;
+  content: string;
+  user_id: string;
+  created_at: string;
+};
+
 type Post = {
   id: number;
   content: string;
   type: string;
   user_email?: string;
   created_at: string;
-  comments_count?: number; 
   
   // 複合クエリの結果
   likes_count: number;
   has_liked: boolean;
+  comments: Comment[]; // ★UPDATED: コメントの配列を持つように変更
 };
 
 type Material = {
@@ -157,33 +165,38 @@ export default function Home() {
     }
   };
   
-  // ★FIX: ログアウト時でもエラーにならないようダミーUUIDを使用
+  // ★UPDATED: コメントも一緒に取得するように修正
   const fetchPosts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    const currentUserId = user ? user.id : '00000000-0000-0000-0000-000000000000'; // ダミーID
+    const currentUserId = user ? user.id : '00000000-0000-0000-0000-000000000000'; 
 
     const { data: posts, error } = await supabase
         .from('posts')
         .select(`
-            id, content, type, user_email, created_at, comments_count,
+            *,
             likes_count:likes(count),
-            user_has_liked:likes(count)
-                .eq('user_id', '${currentUserId}') 
+            user_has_liked:likes(count).eq('user_id', '${currentUserId}'),
+            comments (
+                id, content, created_at, user_id
+            )
         `)
         .order('created_at', { ascending: false });
+        // ※ comments自体の並び替えはJS側で行います（新しい順など）
         
     if (error) {
         console.error("Error fetching posts:", error);
         return;
     }
     
-    const flattenedPosts = posts?.map((post: any) => ({
+    const formattedPosts = posts?.map((post: any) => ({
         ...post,
         likes_count: post.likes_count?.[0]?.count || 0,
         has_liked: post.user_has_liked?.[0]?.count > 0,
+        // コメントを新しい順にソート（必要であれば）
+        comments: post.comments?.sort((a: Comment, b: Comment) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
     } as Post)); 
 
-    if (flattenedPosts) setPosts(flattenedPosts);
+    if (formattedPosts) setPosts(formattedPosts);
   };
   
   const fetchMaterials = async () => {
@@ -232,20 +245,37 @@ export default function Home() {
           else fetchPosts(); 
       } catch (error: any) {
           alert("いいね処理に失敗しました: " + error.message);
-          console.error("Like Toggle Error:", error);
       } finally {
           setLoading(false);
       }
   };
   
+  // ★UPDATED: コメント送信機能（DB保存）
   const handleCommentSubmit = async (postId: number) => {
       const commentContent = commentInputs[postId];
-      if (!commentContent || loading) return;
+      if (!commentContent || loading || !session?.user) return;
+
       setLoading(true);
-      alert(`【コメントを送信】投稿ID: ${postId} / 内容: "${commentContent}"`);
-      setCommentInputs(prev => ({ ...prev, [postId]: '' }));
-      setShowCommentInput(prev => ({ ...prev, [postId]: false }));
-      setLoading(false);
+
+      try {
+          const { error } = await supabase.from("comments").insert([{ 
+              post_id: postId, 
+              user_id: session.user.id, 
+              content: commentContent 
+          }]);
+          
+          if (error) throw error;
+
+          // 送信成功
+          setCommentInputs(prev => ({ ...prev, [postId]: '' }));
+          fetchPosts(); // 投稿一覧（とコメント）を再取得して表示を更新
+          
+      } catch (error: any) {
+          alert("コメントの送信に失敗しました: " + error.message);
+          console.error("Comment Error:", error);
+      } finally {
+          setLoading(false);
+      }
   };
 
   const handleUpload = async () => {
@@ -277,15 +307,13 @@ export default function Home() {
   };
 
   const handlePost = async () => {
-    if (!inputText) return;
+    if (!inputText || !session?.user) return;
     if (selectedType === 'news' && userRole !== 'admin') return alert("Admin only");
     
-    // ★FIX: 投稿時に user_email を保存
     await supabase.from("posts").insert([{ 
         content: inputText, 
         type: selectedType, 
-        user_email: session?.user?.email, 
-        comments_count: 0 
+        user_email: session.user.email
     }]);
     setInputText("");
     fetchPosts();
@@ -450,14 +478,31 @@ export default function Home() {
                     <p className="text-gray-800 text-lg leading-relaxed pl-13">{post.content}</p>
                     <div className="flex gap-6 mt-6 pl-13 border-t border-gray-50 pt-4">
                       <button onClick={() => handleLikeToggle(post.id)} className={`font-bold text-sm flex items-center gap-2 transition ${post.has_liked ? 'text-red-500' : 'text-gray-400'}`}><span>{post.has_liked ? '❤️' : '🤍'}</span> Like ({post.likes_count})</button>
-                      <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} className="text-gray-400 hover:text-blue-500 font-bold text-sm flex items-center gap-2 transition"><span>💬</span> Comment</button>
+                      <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} className="text-gray-400 hover:text-blue-500 font-bold text-sm flex items-center gap-2 transition"><span>💬</span> Comment ({post.comments.length})</button>
                       {userRole === 'admin' && <button onClick={() => handleDeletePost(post.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm flex items-center gap-2 transition ml-auto"><span>🗑️</span> Delete</button>}
                     </div>
+                    
+                    {/* ★NEW: コメント表示・入力エリア */}
                     {showCommentInput[post.id] && (
                         <div className="mt-4 pl-13 pt-4 border-t border-gray-50">
-                            <textarea className="w-full bg-gray-50 p-3 rounded-lg text-sm outline-none resize-none" placeholder="Comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} rows={2} />
+                            {/* コメントリスト */}
+                            <div className="space-y-3 mb-4">
+                                {post.comments.length > 0 ? (
+                                    post.comments.map(comment => (
+                                        <div key={comment.id} className="bg-gray-50 p-3 rounded-lg text-sm">
+                                            <p className="text-gray-800">{comment.content}</p>
+                                            <p className="text-xs text-gray-400 mt-1">{new Date(comment.created_at).toLocaleString()}</p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-xs text-gray-400 italic">No comments yet.</p>
+                                )}
+                            </div>
+                            
+                            {/* 入力フォーム */}
+                            <textarea className="w-full bg-gray-50 p-3 rounded-lg text-sm outline-none resize-none" placeholder="Write a comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} rows={2} />
                             <button onClick={() => handleCommentSubmit(post.id)} disabled={loading || !commentInputs[post.id]} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded-full text-sm font-bold float-right">Send</button>
-                            <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: false }))} className="mt-2 mr-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-1 rounded-full text-sm font-bold float-right">Cancel</button>
+                            <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: false }))} className="mt-2 mr-2 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-1 rounded-full text-sm font-bold float-right">Close</button>
                             <div className="clear-both"></div>
                         </div>
                     )}
