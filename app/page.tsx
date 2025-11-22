@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ChangeEvent, SelectHTMLAttributes } from "react"; // ★ChangeEvent, SelectHTMLAttributesをインポート
 import { supabase } from "@/lib/supabaseClient";
 
 // --- Type Definitions ---
@@ -17,13 +17,26 @@ type Material = {
   title: string;
   file_url: string;
   subject?: string;
-  // ★NEW★
   grade?: string;
   unit?: string;
   description?: string;
+  language?: string; 
 };
 
+// ★NEW★ SelectInput コンポーネントのプロパティ型定義
+interface SelectInputProps {
+    value: string;
+    onChange: (e: ChangeEvent<HTMLSelectElement>) => void; // select要素の変更イベントに型を指定
+    options: string[];
+    placeholder: string;
+}
+
 export default function Home() {
+  // --- Configuration ---
+  const GRADE_OPTIONS = ['Year 12', 'Year 11', 'Year 10'];
+  const SUBJECT_OPTIONS = ['Math', 'English']; 
+  const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
+  
   // --- State Management ---
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -36,13 +49,19 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-  // ★NEW MATERIAL STATES★
+  // MATERIAL UPLOAD STATES
   const [materialTitle, setMaterialTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [materialGrade, setMaterialGrade] = useState(''); 
-  const [materialSubject, setMaterialSubject] = useState(''); 
+  const [materialGrade, setMaterialGrade] = useState(GRADE_OPTIONS[0]);
+  const [materialSubject, setMaterialSubject] = useState(SUBJECT_OPTIONS[0]);
   const [materialUnit, setMaterialUnit] = useState(''); 
   const [materialDescription, setMaterialDescription] = useState(''); 
+  const [uploadLanguage, setUploadLanguage] = useState(LANGUAGE_OPTIONS[0]); 
+
+  // FILTERING STATES
+  const [filterLanguage, setFilterLanguage] = useState('');
+  const [filterGrade, setFilterGrade] = useState('');
+  const [filterSubject, setFilterSubject] = useState('');
 
 
   // --- Data Fetching Functions ---
@@ -60,12 +79,31 @@ export default function Home() {
     const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false });
     if (data) setPosts(data);
   };
+  
   const fetchMaterials = async () => {
-    const { data } = await supabase.from("materials").select("*").order("created_at", { ascending: false });
+    let query = supabase.from("materials").select("*").order("created_at", { ascending: false });
+    
+    // フィルタリングロジックの適用
+    if (filterLanguage && filterLanguage !== 'All Languages') {
+        query = query.eq('language', filterLanguage);
+    }
+    if (filterGrade && filterGrade !== 'All Grades') {
+        query = query.eq('grade', filterGrade);
+    }
+    if (filterSubject && filterSubject !== 'All Subjects') {
+        query = query.eq('subject', filterSubject);
+    }
+    
+    const { data } = await query;
     if (data) setMaterials(data);
   };
   
-  // --- Initialization ---
+  useEffect(() => {
+    if (activeTab === 'materials') {
+      fetchMaterials();
+    }
+  }, [filterLanguage, filterGrade, filterSubject, activeTab]);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -99,7 +137,7 @@ export default function Home() {
   };
 
   const handleUpload = async () => {
-    if (!uploadFile || !materialTitle || !materialSubject) return alert("Please fill in the Title, File, and Subject fields.");
+    if (!uploadFile || !materialTitle || !materialSubject || !materialGrade || !uploadLanguage) return alert("Please fill in the Title, File, Subject, Grade, and Language fields.");
     setLoading(true);
     try {
       const fileName = `${Date.now()}_${uploadFile.name}`;
@@ -114,6 +152,7 @@ export default function Home() {
         grade: materialGrade,
         unit: materialUnit,
         description: materialDescription,
+        language: uploadLanguage, 
       }]);
       
       if (dbError) throw dbError;
@@ -121,10 +160,11 @@ export default function Home() {
       alert("Upload successful!");
       setMaterialTitle("");
       setUploadFile(null);
-      setMaterialGrade('');
-      setMaterialSubject('');
+      setMaterialGrade(GRADE_OPTIONS[0]);
+      setMaterialSubject(SUBJECT_OPTIONS[0]);
       setMaterialUnit('');
       setMaterialDescription('');
+      setUploadLanguage(LANGUAGE_OPTIONS[0]); 
       fetchMaterials();
     } catch (error: any) {
       alert("Error: " + error.message);
@@ -176,6 +216,24 @@ export default function Home() {
       default: return <span className={`${baseClasses} bg-gray-400`}>Other</span>;
     }
   };
+  
+  // ★SelectInput コンポーネントの型を修正
+  const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, placeholder }) => (
+    <select
+        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+        value={value}
+        onChange={onChange}
+    >
+        {/* 'All...'オプションが選択された場合、値が空になるように設定 */}
+        {placeholder.startsWith('All') && <option value="">{placeholder}</option>}
+        {/* 通常のプレースホルダーは、値を持っていないことを保証するためにdisabled={true}にするのがベストだが、ここではフィルタリングのために値を空にする */}
+        {!placeholder.startsWith('All') && <option value="" disabled>{placeholder}</option>}
+        
+        {options.map((opt: string) => ( // ★optにstring型を指定
+            <option key={opt} value={opt}>{opt}</option>
+        ))}
+    </select>
+  );
 
   // ==========================================
   // ▼▼▼ VIEW (JSX) ▼▼▼
@@ -218,8 +276,8 @@ export default function Home() {
                 <div className="h-px bg-gray-200 flex-1"></div>
               </div>
 
-              <input className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <input className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" type="email" placeholder="Email Address" value={email} onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} />
+              <input className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" type="password" placeholder="Password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
               <button onClick={handleLogin} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">Log In</button>
               <button onClick={handleSignUp} className="w-full text-gray-500 py-4 hover:text-blue-600 transition font-bold">Create an account</button>
             </div>
@@ -244,7 +302,7 @@ export default function Home() {
               {[
                 { id: "all", label: "Home", icon: "🏠" },
                 { id: "question", label: "Q&A", icon: "❓" },
-                { id: "tip", label: "Tips", icon: "💡" }, // ★Tipsタブを追加
+                { id: "tip", label: "Tips", icon: "💡" }, 
                 { id: "news", label: "News", icon: "📢" },
                 { id: "materials", label: "Materials", icon: "📚" },
               ].map((item) => (
@@ -276,7 +334,36 @@ export default function Home() {
           {/* Mode: Material Sharing (修正ポイント) */}
           {activeTab === "materials" ? (
             <div className="space-y-6">
-              {/* Upload Card */}
+              
+              {/* ★★★ FILTERING UI ★★★ */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
+                  <h3 className="text-lg font-bold text-gray-800">Filter Materials</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                      {/* 言語フィルター */}
+                      <SelectInput 
+                          value={filterLanguage} 
+                          onChange={(e) => setFilterLanguage(e.target.value)} 
+                          options={['All Languages', ...LANGUAGE_OPTIONS]}
+                          placeholder="All Languages"
+                      />
+                      {/* 学年フィルター */}
+                      <SelectInput 
+                          value={filterGrade} 
+                          onChange={(e) => setFilterGrade(e.target.value)} 
+                          options={['All Grades', ...GRADE_OPTIONS]}
+                          placeholder="All Grades"
+                      />
+                      {/* 教科フィルター */}
+                      <SelectInput 
+                          value={filterSubject} 
+                          onChange={(e) => setFilterSubject(e.target.value)} 
+                          options={['All Subjects', ...SUBJECT_OPTIONS]}
+                          placeholder="All Subjects"
+                      />
+                  </div>
+              </div>
+              
+              {/* Upload Card (アップロードフォーム) */}
               <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-800">Shared Materials</h2>
@@ -290,48 +377,54 @@ export default function Home() {
                       className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
                       placeholder="Title of Document (e.g., N2 Grammar Notes)"
                       value={materialTitle}
-                      onChange={(e) => setMaterialTitle(e.target.value)}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setMaterialTitle(e.target.value)} // ★型修正
                     />
                     
-                    {/* ★学年と教科（一行に） */}
-                    <div className="flex gap-3">
-                        <input
-                            type="text"
-                            className="w-1/2 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
-                            placeholder="Grade (e.g., Univ. 1st Year)"
-                            value={materialGrade}
-                            onChange={(e) => setMaterialGrade(e.target.value)}
+                    {/* ★言語と学年のドロップダウン */}
+                    <div className="grid grid-cols-2 gap-3">
+                         <SelectInput 
+                            value={uploadLanguage} 
+                            onChange={(e) => setUploadLanguage(e.target.value)} 
+                            options={LANGUAGE_OPTIONS}
+                            placeholder="Select Language"
                         />
-                        <input
-                            type="text"
-                            className="w-1/2 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
-                            placeholder="Subject (e.g., Japanese)"
-                            value={materialSubject}
-                            onChange={(e) => setMaterialSubject(e.target.value)}
+                        <SelectInput 
+                            value={materialGrade} 
+                            onChange={(e) => setMaterialGrade(e.target.value)} 
+                            options={GRADE_OPTIONS}
+                            placeholder="Select Grade"
                         />
                     </div>
 
-                    {/* ★単元 */}
-                    <input
-                        type="text"
-                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
-                        placeholder="Unit/Topic (e.g., Adjectives)"
-                        value={materialUnit}
-                        onChange={(e) => setMaterialUnit(e.target.value)}
-                    />
+                    {/* ★教科と単元 */}
+                    <div className="grid grid-cols-2 gap-3">
+                         <SelectInput 
+                            value={materialSubject} 
+                            onChange={(e) => setMaterialSubject(e.target.value)} 
+                            options={SUBJECT_OPTIONS}
+                            placeholder="Select Subject"
+                        />
+                        <input
+                            type="text"
+                            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
+                            placeholder="Unit/Topic (e.g., Adjectives)"
+                            value={materialUnit}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setMaterialUnit(e.target.value)} // ★型修正
+                        />
+                    </div>
 
                     {/* ★説明欄 */}
                     <textarea
                         className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none resize-none h-20"
                         placeholder="Description (Optional)"
                         value={materialDescription}
-                        onChange={(e) => setMaterialDescription(e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setMaterialDescription(e.target.value)} // ★型修正
                     />
 
                     {/* ファイル選択 */}
                     <div className="relative pt-2">
-                        <input type="file" className="hidden" id="fileUpload" onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)} />
-                        {/* 修正点: ユーザーにアップロードすべきファイル形式を明示 */}
+                        {/* ★HTMLInputElementに型を適用 */}
+                        <input type="file" className="hidden" id="fileUpload" onChange={(e: ChangeEvent<HTMLInputElement>) => setUploadFile(e.target.files ? e.target.files[0] : null)} /> 
                         <label htmlFor="fileUpload" className="block w-full p-3 bg-gray-50 rounded-xl text-center text-gray-500 cursor-pointer hover:bg-gray-100 border border-dashed border-gray-300 transition">
                           {uploadFile ? "📄 " + uploadFile.name : "📁 Select File (PDF, DOCX, etc.)"}
                         </label>
@@ -343,22 +436,26 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Grid View for Files */}
+              {/* Grid View for Files (表示内容を修正) */}
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
                 {materials.map((mat) => (
-                  <div key={mat.id} className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition border border-gray-100">
-                    <div className="h-48 bg-gray-100 relative overflow-hidden">
-                      {mat.file_url ? (
-                        <img src={mat.file_url} alt={mat.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-4xl">📄</div>
-                      )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-                        <a href={mat.file_url} target="_blank" className="bg-white text-black px-4 py-2 rounded-full font-bold text-sm hover:scale-105 transition">Open</a>
+                  <div key={mat.id} className="group relative bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100">
+                    <div className="h-48 bg-gray-100 relative overflow-hidden flex items-center justify-center">
+                      <div className="flex flex-col items-center justify-center text-center p-3">
+                         <span className="text-5xl text-gray-300 mb-2">📄</span>
+                         {/* ★NEW TAGS */}
+                         {mat.language && <span className="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-1 rounded-full">{mat.language}</span>}
+                         {(mat.grade || mat.subject) && <span className="bg-green-50 text-green-600 text-xs font-bold px-2 py-1 rounded-full mt-1">{mat.grade} / {mat.subject}</span>}
                       </div>
+                      <a href={mat.file_url} target="_blank" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-sm">
+                        <span className="text-white font-bold bg-white/20 px-4 py-2 rounded-full backdrop-blur-md">Open File</span>
+                      </a>
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-gray-800 truncate">{mat.title}</h3>
+                    <div className="p-4 bg-white relative z-10">
+                      <h3 className="font-bold text-gray-800 truncate" title={mat.title}>{mat.title}</h3>
+                      {/* ★単元と説明を追加 */}
+                      {mat.unit && <p className="text-xs text-gray-600 mt-1 truncate" title={`Unit: ${mat.unit}`}>Unit: {mat.unit}</p>}
+                      {mat.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{mat.description}</p>}
                       <p className="text-xs text-gray-400 mt-1">Shared by user</p>
                     </div>
                   </div>
@@ -366,7 +463,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            /* Mode: Feed Timeline (権限チェックあり) */
+            /* Mode: Feed Timeline (そのまま) */
             <div className="space-y-6">
               {/* Post Input */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
@@ -377,17 +474,16 @@ export default function Home() {
                       className="w-full bg-transparent text-lg outline-none placeholder-gray-400 resize-none h-20"
                       placeholder="What's happening on campus?"
                       value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
+                      onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setInputText(e.target.value)} // ★型修正
                     />
                     <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                       <div className="flex gap-2">
                           <select
                             className="bg-gray-50 px-3 py-2 rounded-lg text-sm font-bold text-gray-600 outline-none cursor-pointer hover:bg-gray-100 transition"
                             value={selectedType}
-                            onChange={(e) => setSelectedType(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedType(e.target.value)} // ★型修正
                           >
                             <option value="question">❓ Q&A</option>
-                            {/* Newsオプションの表示・無効化制御 */}
                             {userRole === 'admin' ? (
                                 <option value="news">📢 News</option>
                             ) : (
@@ -444,7 +540,7 @@ export default function Home() {
         </main>
 
         {/* === [RIGHT COLUMN] Widgets Sidebar === */}
-        <aside className="hidden xl:block w-80 sticky top-8 shrink-0 space-y-6">
+        <aside className="hidden xl:block w-80 sticky top-8 shrink-0">
           {/* Profile Widget */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="font-bold text-gray-400 text-xs uppercase mb-4">Your Profile</h3>
