@@ -17,6 +17,10 @@ type Material = {
   title: string;
   file_url: string;
   subject?: string;
+  // ★NEW★
+  grade?: string;
+  unit?: string;
+  description?: string;
 };
 
 export default function Home() {
@@ -25,52 +29,38 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [userRole, setUserRole] = useState<'student' | 'admin'>('student'); // ★管理者権限のState
+  const [userRole, setUserRole] = useState<'student' | 'admin'>('student'); 
   const [inputText, setInputText] = useState("");
   const [selectedType, setSelectedType] = useState("question");
-  const [activeTab, setActiveTab] = useState("all"); // Tab switching
+  const [activeTab, setActiveTab] = useState("all"); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  
+  // ★NEW MATERIAL STATES★
   const [materialTitle, setMaterialTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [materialGrade, setMaterialGrade] = useState(''); 
+  const [materialSubject, setMaterialSubject] = useState(''); 
+  const [materialUnit, setMaterialUnit] = useState(''); 
+  const [materialDescription, setMaterialDescription] = useState(''); 
+
 
   // --- Data Fetching Functions ---
-
-  // ★管理者権限取得関数
+  // (fetchUserRole, fetchPosts, fetchMaterials は変更なし)
   const fetchUserRole = async () => {
     const user = (await supabase.auth.getSession()).data.session?.user;
-    if (!user) {
-      setUserRole('student');
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-        console.error("Error fetching user role:", error);
-    }
-
-    if (data?.role) {
-      setUserRole(data.role as 'student' | 'admin');
-    } else {
-      const { error: insertError } = await supabase
-        .from("users")
-        .insert({ id: user.id, role: 'student' });
-      if (!insertError) {
-        setUserRole('student');
-      }
+    if (!user) { setUserRole('student'); return; }
+    const { data, error } = await supabase.from("users").select("role").eq("id", user.id).single();
+    if (error && error.code !== 'PGRST116') { console.error("Error fetching user role:", error); }
+    if (data?.role) { setUserRole(data.role as 'student' | 'admin'); } else {
+      const { error: insertError } = await supabase.from("users").insert({ id: user.id, role: 'student' });
+      if (!insertError) { setUserRole('student'); }
     }
   };
-  
   const fetchPosts = async () => {
     const { data } = await supabase.from("posts").select("*").order("created_at", { ascending: false });
     if (data) setPosts(data);
   };
-
   const fetchMaterials = async () => {
     const { data } = await supabase.from("materials").select("*").order("created_at", { ascending: false });
     if (data) setMaterials(data);
@@ -83,7 +73,7 @@ export default function Home() {
       if (session) {
         fetchPosts();
         fetchMaterials();
-        fetchUserRole(); // ★Role取得を呼び出し
+        fetchUserRole(); 
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -91,7 +81,7 @@ export default function Home() {
       if (session) {
         fetchPosts();
         fetchMaterials();
-        fetchUserRole(); // ★Role取得を呼び出し
+        fetchUserRole(); 
       }
     });
     return () => subscription.unsubscribe();
@@ -99,31 +89,46 @@ export default function Home() {
 
   // --- Actions ---
 
-  // ★Googleログイン関数（修正済み）
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // ★修正ポイント: 本番URLに固定
         redirectTo: 'https://globalcampsstpaul.com',
       },
     });
     if (error) alert(error.message);
   };
 
+  // ★handleUpload 修正: 新しいメタデータを含める
   const handleUpload = async () => {
-    if (!uploadFile || !materialTitle) return alert("Please select a title and a file.");
+    if (!uploadFile || !materialTitle || !materialSubject) return alert("Please fill in the Title, File, and Subject fields.");
     setLoading(true);
     try {
       const fileName = `${Date.now()}_${uploadFile.name}`;
       const { error: uploadError } = await supabase.storage.from("materials").upload(fileName, uploadFile);
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from("materials").getPublicUrl(fileName);
-      const { error: dbError } = await supabase.from("materials").insert([{ title: materialTitle, file_url: publicUrl, subject: "general" }]);
+      
+      // ★データベースへの INSERT 処理を更新
+      const { error: dbError } = await supabase.from("materials").insert([{ 
+        title: materialTitle, 
+        file_url: publicUrl, 
+        subject: materialSubject, 
+        grade: materialGrade,
+        unit: materialUnit,
+        description: materialDescription,
+      }]);
+      
       if (dbError) throw dbError;
+      
       alert("Upload successful!");
+      // ★Stateをリセット
       setMaterialTitle("");
       setUploadFile(null);
+      setMaterialGrade('');
+      setMaterialSubject('');
+      setMaterialUnit('');
+      setMaterialDescription('');
       fetchMaterials();
     } catch (error: any) {
       alert("Error: " + error.message);
@@ -132,42 +137,24 @@ export default function Home() {
     }
   };
 
-  // ★投稿処理 (News投稿の権限チェック含む)
   const handlePost = async () => {
     if (!inputText) return;
-    
-    // News投稿の管理者権限チェック
     if (selectedType === 'news' && userRole !== 'admin') {
         alert("You do not have permission to post News.");
         return;
     }
-
     await supabase.from("posts").insert([{ content: inputText, type: selectedType }]);
     setInputText("");
     fetchPosts();
   };
 
-  // ★投稿削除処理 (RLSによりadminのみ実行可能)
   const handleDeletePost = async (postId: number) => {
-      if (!window.confirm("Are you sure you want to delete this post?")) {
-          return;
-      }
-      
+      if (!window.confirm("Are you sure you want to delete this post?")) { return; }
       setLoading(true);
-      const { error } = await supabase
-          .from("posts")
-          .delete()
-          .eq("id", postId); 
-
-      if (error) {
-          alert("Deletion failed: " + error.message);
-          console.error("Delete Error:", error);
-      } else {
-          fetchPosts(); 
-      }
+      const { error } = await supabase.from("posts").delete().eq("id", postId); 
+      if (error) { alert("Deletion failed: " + error.message); console.error("Delete Error:", error); } else { fetchPosts(); }
       setLoading(false);
   };
-
 
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -177,10 +164,7 @@ export default function Home() {
   const handleSignUp = async () => {
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) alert(error.message);
-    else {
-        alert("Check your email!");
-        fetchUserRole(); 
-    }
+    else { alert("Check your email!"); fetchUserRole(); }
   };
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -201,7 +185,7 @@ export default function Home() {
   // ▼▼▼ VIEW (JSX) ▼▼▼
   // ==========================================
 
-  // 1. Login Screen (Google Login含む)
+  // 1. Login Screen (そのまま)
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
@@ -292,7 +276,7 @@ export default function Home() {
         {/* === [CENTER COLUMN] Main Feed === */}
         <main className="flex-1 min-w-0">
           
-          {/* Mode: Material Sharing (そのまま) */}
+          {/* Mode: Material Sharing (修正ポイント) */}
           {activeTab === "materials" ? (
             <div className="space-y-6">
               {/* Upload Card */}
@@ -302,18 +286,57 @@ export default function Home() {
                   <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold">File Storage</span>
                 </div>
                 <div className="flex gap-4 items-end">
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-3">
+                    {/* ★タイトル */}
                     <input
                       type="text"
                       className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
-                      placeholder="Document Title..."
+                      placeholder="Title of Document (e.g., N2 Grammar Notes)"
                       value={materialTitle}
                       onChange={(e) => setMaterialTitle(e.target.value)}
                     />
-                    <div className="relative">
+                    
+                    {/* ★学年と教科（一行に） */}
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            className="w-1/2 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
+                            placeholder="Grade (e.g., Univ. 1st Year)"
+                            value={materialGrade}
+                            onChange={(e) => setMaterialGrade(e.target.value)}
+                        />
+                        <input
+                            type="text"
+                            className="w-1/2 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
+                            placeholder="Subject (e.g., Japanese)"
+                            value={materialSubject}
+                            onChange={(e) => setMaterialSubject(e.target.value)}
+                        />
+                    </div>
+
+                    {/* ★単元 */}
+                    <input
+                        type="text"
+                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none"
+                        placeholder="Unit/Topic (e.g., Adjectives)"
+                        value={materialUnit}
+                        onChange={(e) => setMaterialUnit(e.target.value)}
+                    />
+
+                    {/* ★説明欄 */}
+                    <textarea
+                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-yellow-400 outline-none resize-none h-20"
+                        placeholder="Description (Optional)"
+                        value={materialDescription}
+                        onChange={(e) => setMaterialDescription(e.target.value)}
+                    />
+
+                    {/* ファイル選択 */}
+                    <div className="relative pt-2">
                         <input type="file" className="hidden" id="fileUpload" onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)} />
+                        {/* 修正点: ユーザーにアップロードすべきファイル形式を明示 */}
                         <label htmlFor="fileUpload" className="block w-full p-3 bg-gray-50 rounded-xl text-center text-gray-500 cursor-pointer hover:bg-gray-100 border border-dashed border-gray-300 transition">
-                          {uploadFile ? "📄 " + uploadFile.name : "📁 Select File"}
+                          {uploadFile ? "📄 " + uploadFile.name : "📁 Select File (PDF, DOCX, etc.)"}
                         </label>
                     </div>
                   </div>
