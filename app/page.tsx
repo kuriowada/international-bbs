@@ -1,5 +1,5 @@
 // @ts-nocheck
-// このファイルは、Tailwindの設定エラーを避けるため、標準CSSクラスを使用しています。
+// このコードは、Tailwindの競合を避けるため、標準CSSクラスを使用します。
 
 "use client";
 
@@ -13,11 +13,11 @@ const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
 // チュートリアルコンテンツ
 const tutorialContent = [
-    { id: "all", label: "Home", icon: "🏠", description: "View all activities." },
-    { id: "question", label: "Q&A", icon: "❓", description: "Ask questions." },
-    { id: "tip", label: "Tips", icon: "💡", description: "Share helpful tips." }, 
-    { id: "news", label: "News", icon: "📢", description: "Admin announcements." },
-    { id: "materials", label: "Materials", icon: "📚", description: "Share notes." },
+    { id: "all", label: "Home", icon: "🏠" },
+    { id: "question", label: "Q&A", icon: "❓" },
+    { id: "tip", label: "Tips", icon: "💡" }, 
+    { id: "news", label: "News", icon: "📢" },
+    { id: "materials", label: "Materials", icon: "📚" },
 ];
 
 // --- Type Definitions ---
@@ -28,8 +28,16 @@ type Material = { id: number; title: string; file_url: string; subject?: string;
 // SelectInput Props
 interface SelectInputProps { value: string; onChange: (e: ChangeEvent<HTMLSelectElement>) => void; options: string[]; placeholder: string; }
 
+// SelectInput Component
+const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, placeholder }) => (
+    <select className="select-input" value={value} onChange={onChange}>
+        {placeholder.startsWith('All') && <option value="">{placeholder}</option>}
+        {!placeholder.startsWith('All') && <option value="" disabled>{placeholder}</option>}
+        {options.map((opt: string) => ( <option key={opt} value={opt}>{opt}</option> ))}
+    </select>
+);
 
-// GuidedTourModal
+// GuidedTourModal (インラインスタイルに変更)
 const GuidedTourModal: React.FC<{ 
     currentStep: number; onNext: () => void; onBack: () => void;
     onClose: () => void; onSetTab: (tabId: string) => void; totalSteps: number; 
@@ -41,7 +49,7 @@ const GuidedTourModal: React.FC<{
     useEffect(() => { if (currentStep >= 0) onSetTab(stepData.id); }, [currentStep, stepData.id, onSetTab]);
 
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: '20px' }}>
             <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '24px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#2563eb' }}>🎓 Tutorial Step {currentStep + 1}</h2>
@@ -81,14 +89,12 @@ export default function Home() {
   const [materialUnit, setMaterialUnit] = useState(''); 
   const [materialDescription, setMaterialDescription] = useState(''); 
   const [uploadLanguage, setUploadLanguage] = useState(LANGUAGE_OPTIONS[0]); 
-
   const [filterLanguage, setFilterLanguage] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   
   const [currentTourStep, setCurrentTourStep] = useState(-1);
   const totalTourSteps = tutorialContent.length;
-
   const [showCommentInput, setShowCommentInput] = useState({}); 
   const [commentInputs, setCommentInputs] = useState({}); 
 
@@ -125,7 +131,7 @@ export default function Home() {
 
   const handleGoogleLogin = async () => { await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://globalcampsstpaul.com' } }); };
   const handleLikeToggle = async (postId) => { 
-      if (loading || !session?.user.id) { return alert("Login required"); } setLoading(true);
+      if (loading) return; setLoading(true);
       try { await supabase.rpc('toggle_like', { post_id_input: postId, user_id_input: session.user.id }); fetchPosts(); } catch (e) { console.error(e); } finally { setLoading(false); }
   };
   const handleCommentSubmit = async (postId) => {
@@ -200,14 +206,14 @@ export default function Home() {
                 <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Upload Material</h2>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <input type="text" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }} placeholder="Title" value={materialTitle} onChange={(e) => setMaterialTitle(e.target.value)} />
+                    <input type="text" className="text-input" placeholder="Title" value={materialTitle} onChange={(e) => setMaterialTitle(e.target.value)} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                          <SelectInput value={uploadLanguage} onChange={(e) => setUploadLanguage(e.target.value)} options={LANGUAGE_OPTIONS} placeholder="Select Language"/>
                          <SelectInput value={materialGrade} onChange={(e) => setMaterialGrade(e.target.value)} options={GRADE_OPTIONS} placeholder="Select Grade"/>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                          <SelectInput value={materialSubject} onChange={(e) => setMaterialSubject(e.target.value)} options={SUBJECT_OPTIONS} placeholder="Select Subject"/>
-                         <input type="text" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }} placeholder="Unit/Topic" value={materialUnit} onChange={(e) => setMaterialUnit(e.target.value)} />
+                         <input type="text" className="text-input" placeholder="Unit/Topic" value={materialUnit} onChange={(e) => setMaterialUnit(e.target.value)} />
                     </div>
                     <textarea style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', height: '80px', resize: 'none' }} placeholder="Description" value={materialDescription} onChange={(e) => setMaterialDescription(e.target.value)} />
                     <div style={{ paddingTop: '8px' }}>
@@ -261,11 +267,11 @@ export default function Home() {
                       {getTypeBadge(post.type)}
                     </div>
                     <p style={{ fontSize: '16px', lineHeight: '1.5', marginBottom: '16px', paddingLeft: '52px' }}>{post.content}</p>
-                    <div className="post-actions" style={{ paddingLeft: '52px', borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
-                      <button onClick={() => handleLikeToggle(post.id)} className={`action-btn ${post.has_liked ? 'liked' : ''}`} style={{ color: post.has_liked ? '#ef4444' : '#6b7280' }}>
+                    <div style={{ display: 'flex', gap: '24px', paddingLeft: '52px', borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                      <button onClick={() => handleLikeToggle(post.id)} className={`action-btn ${post.has_liked ? 'liked' : ''}`} style={{ color: post.has_liked ? '#ef4444' : '#6b7280', fontWeight: 'bold', fontSize: '14px' }}>
                           <span>{post.has_liked ? '❤️' : '🤍'}</span> Like ({post.likes_count})
                       </button>
-                      <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} className="action-btn">
+                      <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: !prev[post.id] }))} className="action-btn" style={{ fontWeight: 'bold', fontSize: '14px' }}>
                           <span>💬</span> Comment ({post.comments.length})
                       </button>
                       {userRole === 'admin' && <button onClick={() => handleDeletePost(post.id)} style={{ marginLeft: 'auto', color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Delete</button>}

@@ -1,20 +1,16 @@
 /* app/globals.css - 標準CSS (Tailwindを使用しません) */
 :root {
-  --primary-color: #2563eb; /* Blue */
-  --bg-color: #f3f4f6;      /* Light Gray */
-  --text-color: #1f2937;    /* Dark Gray */
+  --primary-color: #2563eb;
+  --bg-color: #f3f4f6;
+  --text-color: #1f2937;
   --card-bg: #ffffff;
   --border-color: #e5e7eb;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
 }
@@ -38,27 +34,7 @@ body {
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid var(--border-color);
-}
-
-/* 入力欄 */
-.text-input, .textarea-input, .select-input {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-  background-color: white;
-}
-
-/* ボタン */
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white;
-  padding: 8px 20px;
-  border: none;
-  border-radius: 9999px; /* Fully rounded */
-  font-weight: bold;
-  cursor: pointer;
+  margin-bottom: 20px;
 }
 
 /* サイドバー */
@@ -69,70 +45,39 @@ body {
   height: fit-content;
 }
 .sidebar-nav-item button {
-  width: 100%;
-  text-align: left;
-  padding: 12px;
-  background: none;
-  border: none;
-  color: #4b5563;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  width: 100%; text-align: left; padding: 12px; background: none; border: none;
+  color: #4b5563; border-radius: 8px; font-weight: bold; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
 }
 .sidebar-nav-item button.active {
-  color: var(--primary-color);
-  background-color: #eff6ff;
+  color: var(--primary-color); background-color: #eff6ff;
 }
 
-/* 投稿カード */
-.post-card {
-  margin-bottom: 20px;
-}
+/* メインと入力欄 */
+.main-content { flex: 1; }
+.text-input { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; }
+
+/* 投稿・アクションボタン */
 .post-actions {
-  display: flex;
-  gap: 20px;
-  border-top: 1px solid var(--border-color);
-  padding-top: 16px;
-  margin-top: 16px;
+  display: flex; gap: 20px; border-top: 1px solid var(--border-color);
+  padding-top: 16px; margin-top: 16px;
 }
 .post-actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #6b7280;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  background: none; border: none; cursor: pointer; color: #6b7280;
+  font-size: 14px; display: flex; align-items: center; gap: 5px;
 }
-.post-actions button.liked {
-  color: #ef4444;
-}
+.post-actions button.liked { color: #ef4444; }
+.badge { padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; }
+.badge-q { background: #10b981; }
+.badge-n { background: #ef4444; }
+.badge-t { background: #f59e0b; }
 
-/* モバイルヘッダーとフッター (Tailwindなし) */
-.mobile-header {
-  position: fixed; top: 0; left: 0; right: 0; height: 60px;
-  background: white; border-bottom: 1px solid #e5e7eb;
-  z-index: 50; display: flex; justify-content: space-between; align-items: center;
-  padding: 0 16px;
+/* モバイル対応 */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .container { padding: 10px; padding-bottom: 80px; }
+  .mobile-nav {
+    position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid #e5e7eb;
+    display: flex; justify-content: space-around; padding: 8px 0; z-index: 50;
+  }
 }
-.mobile-nav {
-  position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
-  background: white; border-top: 1px solid #e5e7eb;
-  z-index: 50; display: flex; justify-content: space-around; align-items: center;
-  padding-bottom: 4px;
-}
-
-/* Tailwindユーティリティクラスの代替定義 */
-.flex { display: flex; }
-.gap-4 { gap: 1rem; }
-.p-6 { padding: 1.5rem; }
-.w-full { width: 100%; }
-.text-center { text-align: center; }
-
-/* その他 */
-.clear-both { clear: both; }
-.float-right { float: right; }
