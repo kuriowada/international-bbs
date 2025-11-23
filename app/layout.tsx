@@ -13,8 +13,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Global Campus at Stpaul`s",
-  description: "For international students",
+  title: "Global Campus",
+  description: "Connect with students worldwide.",
+  // SNS（XやLINEなど）でシェアされたときの表示設定
+  openGraph: {
+    title: "Global Campus",
+    description: "Connect with students worldwide.",
+    siteName: "Global Campus",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Global Campus",
+    description: "Connect with students worldwide.",
+  },
 };
 
 export default function RootLayout({
