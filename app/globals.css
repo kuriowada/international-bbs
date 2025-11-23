@@ -1,16 +1,18 @@
-/* app/globals.css - 標準CSS (Tailwindを使用しません) */
+/* app/globals.css - Xライクなダークテーマ */
 :root {
-  --primary-color: #2563eb;
-  --bg-color: #f3f4f6;
-  --text-color: #1f2937;
-  --card-bg: #ffffff;
-  --border-color: #e5e7eb;
+  --primary-color: #1DA1F2; /* X (Twitter) Blue */
+  --secondary-color: #262626; /* Darker Gray for accents */
+  --bg-color: #121212;      /* Deep Dark Gray */
+  --text-color: #E0E0E0;    /* Light Gray */
+  --card-bg: #1A1A1A;       /* Slightly lighter dark for cards */
+  --border-color: #2F2F2F;  /* Subtle border in dark theme */
+  --shadow-dark: 0 4px 10px rgba(0,0,0,0.5); /* Stronger shadow for dark theme */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
   line-height: 1.5;
@@ -32,8 +34,8 @@ body {
 .card {
   background: var(--card-bg);
   padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border-radius: 16px;
+  box-shadow: var(--shadow-dark);
   border: 1px solid var(--border-color);
   margin-bottom: 20px;
 }
@@ -44,52 +46,280 @@ body {
   position: sticky;
   top: 32px;
   height: fit-content;
+  background: var(--card-bg);
+  padding: 24px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-dark);
 }
 .sidebar-nav-item button {
   width: 100%; text-align: left; padding: 12px; background: none; border: none;
-  color: #4b5563; border-radius: 8px; font-weight: bold; cursor: pointer;
+  color: var(--text-color);
+  border-radius: 12px;
+  font-weight: bold; cursor: pointer;
   display: flex; align-items: center; gap: 10px;
+  transition: background-color 0.2s, color 0.2s;
+}
+.sidebar-nav-item button:hover {
+  background-color: rgba(255,255,255,0.05);
+  color: var(--primary-color);
 }
 .sidebar-nav-item button.active {
-  color: var(--primary-color); background-color: #eff6ff;
+  color: var(--primary-color);
+  background-color: rgba(29, 161, 242, 0.1); /* Blue with transparency */
+}
+.sidebar .logo {
+    color: var(--primary-color);
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 24px;
 }
 
-/* メインと入力欄 */
+/* メインコンテンツの投稿フォーム */
 .main-content { flex: 1; }
-.text-input, .textarea-input, .select-input {
-  width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; background-color: white;
+.post-input-container {
+  display: flex; gap: 16px;
 }
-
-/* ボタン */
-.btn-primary {
-  background-color: var(--primary-color); color: white; padding: 8px 20px;
-  border: none; border-radius: 9999px; font-weight: bold; cursor: pointer;
+.post-input-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: #3B82F6; /* Placeholder color */
+  flex-shrink: 0;
+}
+.post-textarea {
+  width: 100%; border: none; outline: none; font-size: 16px;
+  resize: none; height: 60px;
+  background-color: transparent; /* Transparent for dark theme */
+  color: var(--text-color);
+}
+.post-form-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px; margin-top: 16px;
+}
+.post-type-select {
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color);
+  background: var(--secondary-color); /* Darker gray background */
+  font-size: 14px;
+  color: var(--text-color);
+  box-shadow: var(--shadow-dark);
+}
+.btn-post {
+  background: var(--primary-color);
+  color: white;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 9999px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: var(--shadow-dark);
+  transition: transform 0.2s ease-in-out;
+}
+.btn-post:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.7);
 }
 
 /* 投稿・アクションボタン */
 .post-actions {
   display: flex; gap: 20px; border-top: 1px solid var(--border-color);
-  padding-top: 16px; margin-top: 16px;
+  padding-top: 16px; margin-top: 16px; padding-left: 52px;
 }
 .post-actions button {
-  background: none; border: none; cursor: pointer; color: #6b7280;
-  font-size: 14px; display: flex; align-items: center; gap: 5px;
+  background: none; border: none; cursor: pointer; color: #8899A6; /* Lighter gray for icons */
+  font-size: 14px; display: flex; align-items: center; gap: 8px;
+  font-weight: 600;
+  transition: color 0.2s;
 }
-.post-actions button.liked { color: #ef4444; }
-.badge { padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; }
-.badge-q { background: #10b981; } .badge-n { background: #ef4444; } .badge-t { background: #f59e0b; }
+.post-actions button:hover {
+    color: var(--primary-color);
+}
+.post-actions button.liked { color: #E0245E; } /* X (Twitter) like color */
+
+/* バッジ */
+.badge {
+  padding: 6px 14px; border-radius: 16px;
+  font-size: 12px; font-weight: bold; color: white;
+  box-shadow: var(--shadow-dark);
+}
+.badge-q { background: #17BF63; } /* Green for Q&A */
+.badge-n { background: #E0245E; } /* Red for News */
+.badge-t { background: #FFAD1F; } /* Yellow for Tips */
+
+/* その他入力 */
+.text-input, .textarea-input, .select-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 14px;
+  background-color: var(--secondary-color); /* Darker gray background */
+  color: var(--text-color);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+.text-input:focus, .textarea-input:focus, .select-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3), 0 0 0 3px rgba(29, 161, 242, 0.2);
+}
+
+/* コメントセクション */
+.comment-area {
+    background: var(--secondary-color);
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--text-color);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+.comment-input-area {
+    margin-top: 16px; padding-left: 52px; border-top: 1px solid var(--border-color); paddingTop: 16px;
+}
+.btn-comment-action {
+    padding: 6px 16px; border-radius: 9999px; border: none;
+    font-size: 13px; font-weight: bold; cursor: pointer;
+    box-shadow: var(--shadow-dark);
+    transition: transform 0.1s ease-in-out;
+}
+.btn-comment-action:hover {
+    transform: translateY(-1px);
+}
+.btn-comment-close { background: #333333; color: #E0E0E0; }
+.btn-comment-send { background: var(--primary-color); color: white; }
+
+
+/* プロフィールとウェルカムカード */
+.profile-card-header {
+    font-size: 12px; font-weight: bold; color: #8899A6; text-transform: uppercase; margin-bottom: 16px;
+}
+.profile-avatar-gradient {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(to top right, #4ade80, #3b82f6); /* Placeholder, can be dynamic */
+}
+.profile-stats-container {
+    display: flex; justify-content: space-between; text-align: center;
+    background: var(--secondary-color); padding: 16px 12px; border-radius: 12px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+    color: var(--text-color);
+}
+.profile-stat-item {
+    font-size: 18px; font-weight: bold;
+}
+.profile-stat-label {
+    font-size: 12px; color: #8899A6;
+}
+
+.welcome-card {
+    background: var(--primary-color); /* Primary color background */
+    padding: 24px; border-radius: 16px;
+    box-shadow: var(--shadow-dark);
+    color: white;
+}
+.welcome-card h3 {
+    font-size: 18px; font-weight: bold; margin-bottom: 8px;
+}
+.welcome-card p {
+    font-size: 14px; opacity: 0.9; line-height: 1.6; margin-bottom: 16px;
+}
+.welcome-card-button {
+    width: 100%; background: white; color: var(--primary-color);
+    padding: 10px; border-radius: 10px; font-weight: bold; font-size: 14px;
+    border: none; cursor: pointer;
+    box-shadow: var(--shadow-dark);
+    transition: transform 0.2s ease-in-out;
+}
+.welcome-card-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.7);
+}
+
+/* マテリアルカード */
+.material-card {
+    padding: 0; overflow: hidden;
+    position: relative;
+    box-shadow: var(--shadow-dark);
+    color: var(--text-color);
+}
+.material-card-image-placeholder {
+    height: 120px; background: #333333; /* Dark gray placeholder */
+    display: flex; flex-direction: column; alignItems: center; justifyContent: center;
+    position: relative;
+}
+.material-card-image-placeholder a {
+    position: absolute; inset: 0; display: flex; alignItems: center; justifyContent: center;
+    background: rgba(0,0,0,0.7); opacity: 0; transition: opacity 0.2s;
+    color: white; font-weight: bold; text-decoration: none;
+    border-radius: 16px 16px 0 0;
+}
+.material-card-image-placeholder a:hover {
+    opacity: 1;
+}
+.material-card-content {
+    padding: 16px;
+    background-color: var(--card-bg);
+}
+.material-card-title {
+    font-weight: bold; font-size: 16px; margin-bottom: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.material-card-meta {
+    font-size: 12px; color: #8899A6;
+}
+.material-delete-btn {
+    margin-top: 8px; color: #E0245E; border: none; background: none; cursor: pointer; font-size: 12px;
+}
+
 
 /* モバイルヘッダーとフッター */
 .mobile-header {
-  position: fixed; top: 0; left: 0; right: 0; height: 60px; background: white; border-bottom: 1px solid #e5e7eb; z-index: 50; display: flex; justify-content: space-between; align-items: center; padding: 0 16px;
+  position: fixed; top: 0; left: 0; right: 0; height: 60px;
+  background: var(--card-bg); box-shadow: var(--shadow-dark);
+  z-index: 50; display: flex; justify-content: space-between; align-items: center;
+  padding: 0 16px;
+  border-radius: 0 0 16px 16px;
+  border-bottom: 1px solid var(--border-color);
 }
+.mobile-header .logo {
+    font-size: 20px; color: var(--primary-color); font-weight: bold;
+}
+.mobile-header .tutorial-btn {
+    background: rgba(29, 161, 242, 0.1); color: var(--primary-color);
+    padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; border: none;
+    box-shadow: var(--shadow-dark);
+}
+
+
 .mobile-nav {
-  position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: white; border-top: 1px solid #e5e7eb; z-index: 50; display: flex; justify-content: space-around; padding: 8px 0;
+  position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+  background: var(--card-bg); box-shadow: var(--shadow-dark);
+  z-index: 50; display: flex; justify-content: space-around; align-items: center;
+  padding-bottom: 4px;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--border-color);
 }
-/* Tailwindユーティリティの代替 */
-.flex { display: flex; } .gap-4 { gap: 1rem; } .w-full { width: 100%; } .float-right { float: right; }
-.p-6 { padding: 1.5rem; } .p-3 { padding: 0.75rem; }
-.rounded-xl { border-radius: 0.75rem; } .rounded-3xl { border-radius: 1.5rem; }
-.shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
-.border { border: 1px solid #e5e7eb; }
-@media (min-width: 768px) { .md\:hidden { display: none; } }
+.mobile-nav button {
+    background: none; border: none; font-size: 24px;
+    color: #8899A6;
+    transition: color 0.2s;
+}
+.mobile-nav button.active {
+    color: var(--primary-color);
+}
+
+
+/* Tailwindユーティリティクラスの代替定義 (必要に応じて追加) */
+.flex { display: flex; }
+.gap-4 { gap: 1rem; }
+.p-6 { padding: 1.5rem; }
+.w-full { width: 100%; }
+.text-center { text-align: center; }
+
+/* その他 */
+.clear-both { clear: both; }
+.float-right { float: right; }
+
+/* PC版のasideをモバイルでは非表示に */
+@media (max-width: 1279px) { /* xlブレークポイントより小さい画面 */
+    aside.hidden.xl\:block {
+        display: none;
+    }
+}
