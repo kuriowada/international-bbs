@@ -1,5 +1,5 @@
 // @ts-nocheck
-// このファイルは、Tailwindの設定エラーを避けるため、標準CSSクラスを使用しています。
+// このコードは、Tailwindの競合を避けるため、標準CSSクラスを使用しています。
 
 "use client";
 
@@ -13,11 +13,11 @@ const LANGUAGE_OPTIONS = ['Japanese', 'Vietnamese', 'English', 'Chinese'];
 
 // チュートリアルコンテンツ
 const tutorialContent = [
-    { id: "all", label: "Home", icon: "🏠", description: "View all activities." },
-    { id: "question", label: "Q&A", icon: "❓", description: "Ask questions." },
-    { id: "tip", label: "Tips", icon: "💡", description: "Share helpful tips." }, 
-    { id: "news", label: "News", icon: "📢", description: "Admin announcements." },
-    { id: "materials", label: "Materials", icon: "📚", description: "Share notes." },
+    { id: "all", label: "Home", icon: "🏠" },
+    { id: "question", label: "Q&A", icon: "❓" },
+    { id: "tip", label: "Tips", icon: "💡" }, 
+    { id: "news", label: "News", icon: "📢" },
+    { id: "materials", label: "Materials", icon: "📚" },
 ];
 
 // --- Type Definitions ---
@@ -30,14 +30,14 @@ interface SelectInputProps { value: string; onChange: (e: ChangeEvent<HTMLSelect
 
 // SelectInput Component
 const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, placeholder }) => (
-    <select className="select-input" value={value} onChange={onChange}>
+    <select className="select-input" value={value} onChange={onChange} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', background: 'white' }}>
         {placeholder.startsWith('All') && <option value="">{placeholder}</option>}
         {!placeholder.startsWith('All') && <option value="" disabled>{placeholder}</option>}
         {options.map((opt: string) => ( <option key={opt} value={opt}>{opt}</option> ))}
     </select>
 );
 
-// GuidedTourModal (インラインスタイル)
+// GuidedTourModal
 const GuidedTourModal: React.FC<{ 
     currentStep: number; onNext: () => void; onBack: () => void;
     onClose: () => void; onSetTab: (tabId: string) => void; totalSteps: number; 
@@ -89,6 +89,7 @@ export default function Home() {
   const [materialUnit, setMaterialUnit] = useState(''); 
   const [materialDescription, setMaterialDescription] = useState(''); 
   const [uploadLanguage, setUploadLanguage] = useState(LANGUAGE_OPTIONS[0]); 
+
   const [filterLanguage, setFilterLanguage] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
@@ -281,14 +282,16 @@ export default function Home() {
                     {showCommentInput[post.id] && (
                         <div style={{ marginTop: '16px', paddingLeft: '52px', borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
                             <div style={{ marginBottom: '16px' }}>
-                                {post.comments.map(comment => (
-                                    <div key={comment.id} style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '8px', fontSize: '14px' }}>
-                                        <p style={{ margin: 0, color: '#1f2937' }}>{comment.content}</p>
-                                        <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#9ca3af' }}>{new Date(comment.created_at).toLocaleString()}</p>
-                                    </div>
-                                ))}
+                                {post.comments.length > 0 ? (
+                                    post.comments.map(comment => (
+                                        <div key={comment.id} style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '8px', fontSize: '14px' }}>
+                                            <p style={{ margin: 0, color: '#1f2937' }}>{comment.content}</p>
+                                            <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#9ca3af' }}>{new Date(comment.created_at).toLocaleString()}</p>
+                                        </div>
+                                    ))
+                                ) : (<p style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic' }}>No comments yet.</p>)}
                             </div>
-                            <textarea className="text-input" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '14px', resize: 'none', minHeight: '60px' }} placeholder="Comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} />
+                            <textarea style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '14px', resize: 'none', minHeight: '60px' }} placeholder="Comment..." value={commentInputs[post.id] || ''} onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} />
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                                 <button onClick={() => setShowCommentInput(prev => ({ ...prev, [post.id]: false }))} style={{ padding: '4px 12px', borderRadius: '9999px', border: 'none', background: '#e5e7eb', color: '#4b5563', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Close</button>
                                 <button onClick={() => handleCommentSubmit(post.id)} disabled={loading || !commentInputs[post.id]} style={{ padding: '4px 12px', borderRadius: '9999px', border: 'none', background: '#2563eb', color: 'white', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Send</button>
