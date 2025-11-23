@@ -24,7 +24,7 @@ type Comment = { id: string; content: string; user_id: string; created_at: strin
 type Post = { id: number; content: string; type: string; user_email?: string; created_at: string; likes_count: number; has_liked: boolean; comments: Comment[]; };
 type Material = { id: number; title: string; file_url: string; subject?: string; grade?: string; unit?: string; description?: string; language?: string; };
 
-// SelectInput Component (CSSクラスを使用するように変更)
+// SelectInput Component
 interface SelectInputProps { value: string; onChange: (e: ChangeEvent<HTMLSelectElement>) => void; options: string[]; placeholder: string; }
 const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, placeholder }) => (
     <select className="select-input" value={value} onChange={onChange}>
@@ -34,7 +34,7 @@ const SelectInput: React.FC<SelectInputProps> = ({ value, onChange, options, pla
     </select>
 );
 
-// GuidedTourModal (ダークテーマ対応)
+// GuidedTourModal
 const GuidedTourModal: React.FC<{ 
     currentStep: number; onNext: () => void; onBack: () => void;
     onClose: () => void; onSetTab: (tabId: string) => void; totalSteps: number; 
@@ -68,15 +68,23 @@ const GuidedTourModal: React.FC<{
 };
 
 export default function Home() {
+  // --- State ---
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // ページ全体の読み込み状態
+  
+  // Login States
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // App States
   const [posts, setPosts] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [userRole, setUserRole] = useState('student'); 
   const [inputText, setInputText] = useState("");
   const [selectedType, setSelectedType] = useState("question");
   const [activeTab, setActiveTab] = useState("all"); 
-  const [email, setEmail] = useState(""); // Login handled in separate page usually, but keeping for structure
   
   const [materialTitle, setMaterialTitle] = useState("");
   const [uploadFile, setUploadFile] = useState(null);
@@ -96,23 +104,49 @@ export default function Home() {
   const [showCommentInput, setShowCommentInput] = useState({}); 
   const [commentInputs, setCommentInputs] = useState({}); 
 
-  // ツアー制御
+  // --- Auth Handlers ---
+  const handleLogin = async () => {
+    setAuthLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    setAuthLoading(false);
+    if (error) alert(`Login Error: ${error.message}`);
+    // 成功すればonAuthStateChangeが発火してsessionがセットされ、自動で画面が切り替わる
+  };
+
+  const handleSignUp = async () => {
+    setAuthLoading(true);
+    const { error } = await supabase.auth.signUp({ email: loginEmail, password: loginPassword });
+    setAuthLoading(false);
+    if (error) alert(`Sign Up Error: ${error.message}`);
+    else alert("Check your email for confirmation link.");
+  };
+
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({ 
+      provider: 'google', 
+      options: { redirectTo: window.location.origin } // 現在のURL (ルート) に戻る
+    });
+  };
+
+  const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+
+  // --- App Logic ---
   const startTour = () => setCurrentTourStep(0);
   const nextStep = () => setCurrentTourStep((prev) => Math.min(prev + 1, totalTourSteps - 1));
   const backStep = () => setCurrentTourStep((prev) => Math.max(prev - 1, 0));
   const endTour = () => setCurrentTourStep(-1);
 
-  const fetchUserRole = async () => {
-    const user = (await supabase.auth.getSession()).data.session?.user;
-    if (!user) return;
-    const { data } = await supabase.from("users").select("role").eq("id", user.id).single();
+  const fetchUserRole = async (userId) => {
+    if (!userId) return;
+    const { data } = await supabase.from("users").select("role").eq("id", userId).single();
     if (data?.role) setUserRole(data.role);
-    else await supabase.from("users").insert({ id: user.id, role: 'student' });
+    else await supabase.from("users").insert({ id: userId, role: 'student' });
   };
   
   const fetchPosts = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    const currentUserId = user ? user.id : '00000000-0000-0000-0000-000000000000'; 
+    if (!user) return; 
+    const currentUserId = user.id;
     const { data: posts, error } = await supabase.from('posts').select(`*, likes_count:likes(count), user_has_liked:likes(count).eq('user_id', '${currentUserId}'), comments (id, content, created_at, user_id)`).order('created_at', { ascending: false });
     if (error) { console.error("Error:", error); return; }
     const formattedPosts = posts?.map((post) => ({ ...post, likes_count: post.likes_count?.[0]?.count || 0, has_liked: post.user_has_liked?.[0]?.count > 0, comments: post.comments || [] })); 
@@ -129,25 +163,46 @@ export default function Home() {
   };
   
   useEffect(() => { if (activeTab === 'materials') fetchMaterials(); }, [filterLanguage, filterGrade, filterSubject, activeTab]);
+  
+  // Session Management
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => { 
-        setSession(session); 
-        if (session) { fetchPosts(); fetchMaterials(); fetchUserRole(); }
-        // 未ログイン時は本来ここでリダイレクト処理などを入れる
+    const initSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        if (session) {
+            await fetchUserRole(session.user.id);
+            fetchPosts();
+            fetchMaterials();
+        }
+        setLoading(false);
+    };
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        if (session) {
+             fetchUserRole(session.user.id);
+             fetchPosts();
+             fetchMaterials();
+        }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  // --- Action Handlers ---
   const handleLikeToggle = async (postId) => { 
-      if (loading) return; setLoading(true);
-      try { await supabase.rpc('toggle_like', { post_id_input: postId, user_id_input: session.user.id }); fetchPosts(); } catch (e) { console.error(e); } finally { setLoading(false); }
+      if (!session) return;
+      try { await supabase.rpc('toggle_like', { post_id_input: postId, user_id_input: session.user.id }); fetchPosts(); } catch (e) { console.error(e); }
   };
   const handleCommentSubmit = async (postId) => {
-      if (!commentInputs[postId] || loading) return; setLoading(true);
+      if (!commentInputs[postId] || !session) return; 
       await supabase.from("comments").insert([{ post_id: postId, user_id: session.user.id, content: commentInputs[postId] }]);
-      setCommentInputs(prev => ({ ...prev, [postId]: '' })); fetchPosts(); setLoading(false);
+      setCommentInputs(prev => ({ ...prev, [postId]: '' })); fetchPosts();
   };
   const handleUpload = async () => {
-    if (!uploadFile || !materialTitle) return alert("Fill fields"); setLoading(true);
+    if (!uploadFile || !materialTitle) return alert("Fill fields"); 
+    setLoading(true);
     const fileName = `${Date.now()}_${uploadFile.name}`;
     await supabase.storage.from("materials").upload(fileName, uploadFile);
     const { data: { publicUrl } } = supabase.storage.from("materials").getPublicUrl(fileName);
@@ -155,9 +210,8 @@ export default function Home() {
     alert("Uploaded!"); setMaterialTitle(""); setUploadFile(null); fetchMaterials(); setLoading(false);
   };
   const handleDeleteMaterial = async (id, url) => { if(confirm("Delete?")) { await supabase.from("materials").delete().eq("id", id); fetchMaterials(); }};
-  const handlePost = async () => { if (!inputText) return; await supabase.from("posts").insert([{ content: inputText, type: selectedType, user_email: session.user.email }]); setInputText(""); fetchPosts(); };
+  const handlePost = async () => { if (!inputText || !session) return; await supabase.from("posts").insert([{ content: inputText, type: selectedType, user_email: session.user.email }]); setInputText(""); fetchPosts(); };
   const handleDeletePost = async (id) => { if(confirm("Delete?")) { await supabase.from("posts").delete().eq("id", id); fetchPosts(); }};
-  const handleLogout = async () => { await supabase.auth.signOut(); window.location.href = "/login"; }; // ログアウト後はログイン画面へ
 
   const getTypeBadge = (type) => {
     let className = "badge ";
@@ -170,6 +224,75 @@ export default function Home() {
     return <span className={className}>{type.toUpperCase()}</span>;
   };
 
+  // -------------------------------------------
+  // 1. Loading View
+  // -------------------------------------------
+  if (loading) {
+    return (
+        <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
+            <h2>Loading...</h2>
+        </div>
+    );
+  }
+
+  // -------------------------------------------
+  // 2. Login View (If no session)
+  // -------------------------------------------
+  if (!session) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px', background: 'var(--bg-color)' }}>
+        <div className="card" style={{ width: '100%', maxWidth: '900px', height: '600px', padding: 0, display: 'flex', flexDirection: 'row' }}>
+          {/* Left Branding Panel (PC Only) */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '40px', background: 'linear-gradient(135deg, #1A365D, #000000)', color: 'white', borderRadius: '16px 0 0 16px' }} className="hidden md:flex">
+            <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '1rem', letterSpacing: '2px' }}>GLOBAL CAMPUS</h1>
+            <p style={{ fontSize: '1.1rem', opacity: 0.8, textAlign: 'center' }}>Connect with students worldwide.</p>
+          </div>
+  
+          {/* Right Form Area */}
+          <div style={{ flex: 1, padding: '60px 50px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 16px 16px 0', background: 'var(--card-bg)' }}>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '30px', color: 'var(--text-color)' }}>
+              {isLoginMode ? 'Log in to your account' : 'Create an account'}
+            </h2>
+  
+            <button onClick={handleGoogleLogin} disabled={authLoading} className="btn-post" style={{ background: 'var(--primary-color)', color: 'white', marginBottom: '20px', padding: '12px 28px', display: 'flex', justifyContent: 'center', width: '100%' }}>
+              <span>G</span>&nbsp; {isLoginMode ? 'Sign in with Google' : 'Sign up with Google'}
+            </button>
+  
+            <div style={{ display: 'flex', alignItems: 'center', margin: '15px 0' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+              <span style={{ padding: '0 15px', color: 'var(--text-color)', fontSize: '0.9rem' }}>OR</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }}></div>
+            </div>
+  
+            <input type="email" placeholder="Email Address" className="text-input" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} style={{ marginBottom: '15px' }} />
+            <input type="password" placeholder="Password" className="text-input" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} style={{ marginBottom: '30px' }} />
+  
+            <button onClick={isLoginMode ? handleLogin : handleSignUp} disabled={authLoading} className="btn-post" style={{ background: isLoginMode ? 'var(--primary-color)' : 'var(--secondary-color)', padding: '12px 28px', width: '100%' }}>
+              {authLoading ? 'Processing...' : (isLoginMode ? 'Log In' : 'Sign Up')}
+            </button>
+  
+            <p style={{ marginTop: '20px', textAlign: 'center', color: 'var(--text-color)', fontSize: '0.9rem' }}>
+              {isLoginMode ? "Don't have an account?" : "Already have an account?"}{' '}
+              <button onClick={() => setIsLoginMode(!isLoginMode)} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontWeight: 'bold', cursor: 'pointer', padding: 0 }}>
+                {isLoginMode ? 'Sign Up' : 'Log In'}
+              </button>
+            </p>
+          </div>
+          <style jsx>{`
+            @media (max-width: 768px) {
+              .hidden.md\\:flex { display: none !important; }
+              .card { height: auto !important; }
+              .card > div:last-child { border-radius: 16px !important; padding: 40px 20px !important; }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------
+  // 3. Main App View (If logged in)
+  // -------------------------------------------
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)' }}>
       {/* Mobile Header */}
@@ -324,7 +447,7 @@ export default function Home() {
                     <div className="profile-avatar-gradient"></div>
                     <div>
                         <p style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-color)' }}>You ({userRole})</p>
-                        <p style={{ fontSize: '12px', color: '#8899A6' }}>{session?.user.email || email}</p>
+                        <p style={{ fontSize: '12px', color: '#8899A6' }}>{session?.user?.email || ""}</p>
                     </div>
                 </div>
                 <div className="profile-stats-container">
